@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/hpets/Desktop/Projects/AMA/ama-game -not -path */node_modules* -not -path */dist/* -type f -o -type d)",
+      "Read(//c/Users/hpets/Desktop/Projects/AMA/AMA_Art_Book/07_Character_Fronts//**)",
+      "Read(//c/Users/hpets/Desktop/Projects/AMA/AMA_Art_Book/08_Character_Backs//**)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

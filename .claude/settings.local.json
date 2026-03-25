@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/hpets/Desktop/Projects/AMA/$HOME/.claude/**)",
+      "Read(//c/Users/hpets/Desktop/Projects/AMA/$HOME/**)",
+      "Bash(/dev/null -exec ls -lt {} +)",
+      "Bash(npx vite:*)",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(gh auth:*)",
+      "Bash(git --version)"
+    ]
+  }
+}
