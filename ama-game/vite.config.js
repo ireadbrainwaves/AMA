@@ -5,5 +5,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   cacheDir: '/tmp/vite-cache',
-  base: '/AMA/',
+  // base: '/AMA/', // uncomment for GitHub Pages
 })

@@ -9,3 +9,8 @@ dist-ssr
 *.suo
 *.sw?
 /tmp/
+AMA_Art_Book/
+AMA/
+*.skill
+ama-game/src/assets/sprites/originals_backup/
+ama-game/src/assets/sprites/processed/

@@ -9,7 +9,8 @@
       "Bash(npm install:*)",
       "Bash(npm uninstall:*)",
       "Bash(gh auth:*)",
-      "Bash(git --version)"
+      "Bash(git --version)",
+      "Bash(npx vercel:*)"
     ]
   }
 }
