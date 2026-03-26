@@ -178,13 +178,16 @@ export default function HarvestScreen({
           const weakness = mut.weakness || SPECIES_WEAKNESS[defeatedSpecies];
           const attrLabel = getAttrModLabel(mut.attrMod);
 
+          const speciesColor = opp?.color || '#4488cc';
           return (
             <div key={mut.id} style={{
-              flex: '1 1 220px', maxWidth: 260, background: '#0a1220', border: '1px solid #1a2838',
-              padding: 14, cursor: 'pointer', transition: 'border-color 0.15s',
+              flex: '1 1 220px', maxWidth: 260, background: '#0a1220',
+              border: `1px solid ${speciesColor}40`,
+              boxShadow: `0 0 12px ${speciesColor}15, inset 0 0 20px ${speciesColor}08`,
+              padding: 14, cursor: 'pointer', transition: 'all 0.2s ease',
             }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#2a5878'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = '#1a2838'}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = speciesColor; e.currentTarget.style.boxShadow = `0 0 20px ${speciesColor}30`; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = `${speciesColor}40`; e.currentTarget.style.boxShadow = `0 0 12px ${speciesColor}15, inset 0 0 20px ${speciesColor}08`; }}
             >
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -250,6 +253,28 @@ export default function HarvestScreen({
           );
         })}
       </div>
+
+      {/* Current build display */}
+      {playerMutations.length > 0 && (
+        <div style={{
+          maxWidth: 600, width: '100%', background: '#080e18', border: '1px solid #1a2838',
+          padding: '10px 14px', position: 'relative', zIndex: 1,
+        }}>
+          <div style={{ fontSize: 9, color: '#4a6a7a', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>// your current grafts</div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {['head', 'arms', 'chest', 'back', 'legs'].map(slot => {
+              const mut = playerMutations.find(m => m.slot === slot);
+              return (
+                <div key={slot} style={{ fontSize: 10, color: mut ? '#8899aa' : '#2a3a4a' }}>
+                  <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{slot}</span>
+                  {': '}
+                  <span style={{ color: mut ? '#c0d0d8' : '#2a3a4a' }}>{mut ? mut.name : 'empty'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Skip button */}
       <button

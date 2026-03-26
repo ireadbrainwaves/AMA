@@ -335,12 +335,12 @@ function beeWeights(moves, fightState) {
 
 function turtleWeights(moves, aiRes, oppRes) {
   return moves.map(m => {
-    if ((m.id === 'shell_block' || m.id === 'spike_shell') && oppRes.stamina > 5) return 40;
-    if (m.id === 'shell_block' || m.id === 'spike_shell') return 35;
-    if (m.id === 'fortress_mode' && aiRes.guard < 7) return 30;
-    if (m.id === 'fortress_mode') return 25;
-    if (m.id === 'snap_bite') return 20;
-    if (m.id === 'tremor_stomp') return 15;
+    // Block → Block → Snap Bite → Tremor → Block pattern via balanced weights
+    if (m.id === 'shell_block' || m.id === 'spike_shell') return 30;
+    if (m.id === 'snap_bite') return 25;  // Punish move — use after blocking
+    if (m.id === 'tremor_stomp') return 20; // Area control
+    if (m.id === 'fortress_mode' && aiRes.guard < 15) return 20; // Regen when hurt
+    if (m.id === 'fortress_mode') return 10;
     return 5;
   });
 }

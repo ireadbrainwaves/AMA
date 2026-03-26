@@ -286,6 +286,16 @@ export default function ScoutingScreen({ playerCharKey, opponentCharKey, onEnter
         <div className="npc-name" style={{ color: 'var(--purple)' }}>Cmdr. Vex</div>
         <div className="npc-text">
           {(() => {
+            // Matchup-specific hints (player species vs opponent)
+            const matchupHints = {
+              'cyberGorilla_terrorPinTurtle': '"That Turtle\'s going to sit behind its shell all day. Don\'t punch the shell. Grab it. Rip it open. Iron Grip. Trust me."',
+              'cyberGorilla_psychoSquid': '"Squid will mess with your head. Keep your composure up. Gorilla Punch through its guard before it melts your mind."',
+              'beeSwarm_terrorPinTurtle': '"Turtle will try to outlast your sting. Swarm Pressure gets around the shell. Area moves — use them."',
+              'psychoSquid_cyberGorilla': '"That Gorilla hits hard but it\'s all POWER. Defense and evasion shut it down. Mind Spike the composure."',
+              'terrorPinTurtle_beeSwarm': '"Bees are fast but fragile. Shell Block absorbs the stings. Snap Bite when they scatter."',
+            };
+            const key = `${playerCharKey}_${opponentCharKey}`;
+            if (matchupHints[key]) return matchupHints[key];
             const flavors = SPECIES_FLAVOR[opponentCharKey];
             if (flavors) return flavors[Math.floor(Math.random() * flavors.length)];
             if (encounters === 0) return '"First time facing this one. Stay sharp. Or don\'t. I get paid either way."';

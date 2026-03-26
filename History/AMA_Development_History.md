@@ -1232,3 +1232,122 @@ Modified:
   src/data/spriteMap.js                              — Vite imports for all 11 base sprites
   src/data/slotOffsets.js                            — Per-species slot offsets for mutation positioning
 ```
+
+---
+
+## Session 4 — Victory Screen Upgrade + Six Feature Sprint
+
+### Context
+User requested victory screen upgrades, then when presented with a list of next features (fight HUD buffs, save/load, settings, music system, character select upgrade, fight intro), responded "lets do it all." All six features were built and integrated in a single session. Claude Code was running balance work in VS Code concurrently. User is also making jungle beats for background music.
+
+### What was built
+
+#### Victory Screen Upgrade (v2)
+Complete rewrite of the already-rewritten VictoryScreen with major enhancements:
+- **Letter-by-letter title reveal** — "CHAMPION" letters animate in one at a time with gradient shimmer and glow
+- **Performance grade system** — S/A/B/C/D rating calculated from fights won, turn count, and scar penalty. Grade slams in with scale animation and category-specific colors (S=gold, A=green, B=blue, C=grey, D=red)
+- **Animated counting stats** — All numbers roll up from 0 with ease-out cubic easing using custom `useCountUp` hook
+- **Floating particle effects** — Green particles for normal wins, gold for S-rank. 25 particles with randomized size, speed, delay, opacity
+- **Career record with win rate** — Runs/Wins/Win% in a 3-column grid
+- **14 contextual Vex quotes** — Covers: perfect run + fast, perfect + no scars, S-rank, 10+ wins, 5+ wins, new PB, veteran, heavy tech, scarred champion, heavy mutations, default
+- **Staggered opponent cards** — Each defeated opponent slides in with 150ms delay
+- **"NEW BEST" badge** — Animated pulse on new personal best
+
+#### Defeat Screen Upgrade (v2)
+Matching overhaul of DefeatScreen:
+- **Glitch title effect** — "DEFEATED" with RGB split/offset that bursts on load (6 rapid glitch frames), settles, then randomly re-glitches every ~2 seconds with 15% chance
+- **Falling ember particles** — 18 red/orange embers drifting down with randomized properties
+- **Animated counting stats** — Same `useCountUp` hook as victory
+- **Killer name in species color** — "fell to [colored name]" subtitle
+- **16 contextual Vex quotes** — Covers: first run, first fight loss, final fight loss, Parasitex, Echomorph, Hydravine, long losing streaks, champion's fall, heavy scars, heavy mutations, specific fight numbers, veteran, default
+- **Vignette overlay** — Radial gradient darkening edges
+
+#### Fight HUD Buffs Display
+Added active buff/debuff indicator tray to the fight screen player resource panel. Shows colored tags with glow for:
+- Damage Shield (blue) — shows remaining absorption
+- Focus Lens (gold) — guaranteed win next matchup
+- Flash Grenade (white) — opponent deals 0
+- Scramble Dart (orange) — forced random AI with turn counter
+- Scanner Pulse (cyan) — see opponent move with turn counter
+- Adrenaline (red) — active indicator
+- Entangle (green) — restricted movement
+- Venom DoT (purple) — damage over time
+
+#### Mid-Run Save/Load System
+New `src/engine/SaveManager.js` with 5 exported functions:
+- `saveRun(state)` — Serializes full run state to localStorage (version 1 format with timestamp)
+- `loadRun()` — Retrieves and validates saved run, returns null if invalid
+- `hasSavedRun()` — Quick existence check
+- `clearSave()` — Removes save data
+- `getSaveInfo()` — Returns summary (character, arenas cleared, mutations, timestamp) for UI display
+
+Integration in App.jsx:
+- Auto-saves on every transition to `overworld` or `harvest` screens
+- Clears save on victory or defeat (run is over)
+- CharacterSelect shows "Continue Run" banner with Resume/Delete buttons when save exists
+- `handleContinueRun(save)` restores all state variables from save data
+
+#### Settings Screen
+New `src/screens/SettingsScreen.jsx` — modal overlay accessible from hub world gear button:
+- **Music volume slider** — 0-100% with colored fill and real-time update
+- **SFX volume slider** — 0-100% with colored fill, persists to localStorage
+- **Music toggle** — ON/OFF button that enables/disables background music
+- **Career stats section** — Total runs, wins, losses, win rate, best run
+- **Codex summary** — Shows defeated/encountered ratio for each species
+- **Controls reference** — Click, Items, Push explained
+- **Version footer** — "AMA v0.1"
+- Gear icon (&#9881;) button added to HubWorld2D top-right corner
+
+#### Music Player System
+New `src/engine/MusicManager.js` — Web Audio API background music system:
+- **Per-screen track mapping** — select→menu, overworld→hub, fight→battle, victory→victory, defeat→defeat, harvest→hub
+- **Crossfade transitions** — 0.6s fade out old track, 0.8s fade in new track
+- **Audio buffer caching** — Prevents re-fetching same track
+- **Graceful degradation** — Returns null when music files don't exist (no errors)
+- **Volume persistence** — Saves to localStorage (ama_music_vol, ama_sfx_vol, ama_music_on)
+- **Suspended AudioContext handling** — Auto-resumes on user interaction
+- Track files expected at `public/assets/music/{name}.mp3` (menu, hub, battle, victory, defeat, intro)
+- Music triggered on screen transitions via `playMusic(screen)` in `fadeToScreen()`
+- Initial music triggered on component mount via useEffect
+
+#### Character Select Upgrade
+Complete rewrite of `src/screens/CharacterSelect.jsx`:
+- **Staggered card reveal** — Cards animate in one at a time (150ms intervals) with translate+scale
+- **Gradient title** — "Alien Martial Arts" with cyan gradient and glow filter
+- **Floating particles** — 18 soft cyan particles rising
+- **Animated stat bars** — Bars fill from 0% to actual value when a character is selected (500ms ease)
+- **Larger sprites** — 48x48 (up from 40x40) with glow drop-shadow on selection
+- **Move preview panel** — Slides in below cards when a character is selected, showing all 5 moves with name, cost, and flavor text. Each move card fades in with stagger.
+- **Archetype labels** — HEAVY HITTER, MENTALIST, ATTRITION, FORTRESS per species
+- **Continue Run banner** — Shows saved run info with Resume/Delete options
+- **10 contextual Vex quotes** — First run, 10+ wins, 5+ wins, stubborn fighter, long losing streak, early runs, mid runs, veteran, default
+
+#### Fight Intro VS Splash
+New `src/screens/FightIntro.jsx` — cinematic sequence before each fight:
+- **Diagonal split background** — Player color left, opponent color right
+- **Fighter slide-in** — Player slides from left, opponent from right (500ms cubic-bezier)
+- **Character sprites** — 120x160 pixel art with glow, opponent mirrored
+- **VS stamp** — 72px text slams into center from 3x scale with screen flash overlay
+- **Fight number banner** — "Fight X of 4" or "BOSS FIGHT" for Parasitex
+- **Counter-mechanic badge** — Yellow "COUNTER-MECHANIC" tag for Echomorph/Hydravine
+- **Auto-advance** — Entire sequence runs ~2.5 seconds then fades out and hands off to FightScreen
+- **Exit animation** — 0.4s opacity fade on sequence end
+
+Integrated via `startFightWithIntro()` in App.jsx — scouting screen's "Enter" button now triggers intro overlay before transitioning to fight screen.
+
+### File changes
+```
+New:
+  src/screens/FightIntro.jsx           — VS splash fight intro component
+  src/screens/SettingsScreen.jsx       — Settings modal with volume, stats, codex
+  src/engine/MusicManager.js           — Web Audio API music system with crossfade
+  src/engine/SaveManager.js            — localStorage save/load for mid-run persistence
+  public/assets/music/                 — Directory for music files (awaiting user's jungle beats)
+
+Modified:
+  src/screens/VictoryScreen.jsx        — v2: letter reveal, grade system, particles, animated counters, 14 Vex quotes
+  src/screens/DefeatScreen.jsx         — v2: glitch title, embers, animated counters, 16 Vex quotes
+  src/screens/CharacterSelect.jsx      — Staggered reveals, move preview, animated stats, continue run, particles
+  src/screens/HubWorld2D.jsx           — Added settings gear button (top-right)
+  src/App.jsx                          — FightIntro/SettingsScreen/MusicManager/SaveManager imports, useEffect for music, showSettings/showFightIntro state, handleContinueRun, startFightWithIntro, auto-save in fadeToScreen, clearSave on victory/defeat, onContinue prop to CharacterSelect
+```

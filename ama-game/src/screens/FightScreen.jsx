@@ -5,7 +5,7 @@ import { getAIDecision, getIntentDisplay } from '../engine/AIEngine';
 import { playSound } from '../engine/SoundManager';
 import MatchupGuide from '../components/MatchupGuide';
 import BattleArena from '../components/BattleArena';
-import { INITIAL_RESOURCES, MAX_GUARD, MAX_COMPOSURE, MAX_BODY, MAX_STAMINA, STAMINA_CAP, STAMINA_REGEN, MAX_TURNS, MUTATION_HP_SMALL, MUTATION_HP_LARGE, TECH_ENHANCEMENTS } from '../data/constants';
+import { INITIAL_RESOURCES, MAX_GUARD, MAX_COMPOSURE, MAX_BODY, MAX_STAMINA, STAMINA_CAP, STAMINA_REGEN, MAX_TURNS, MUTATION_HP_SMALL, MUTATION_HP_LARGE, TECH_ENHANCEMENTS, GUARD_REGEN, COMPOSURE_REGEN } from '../data/constants';
 import { speciesMutations, SPECIES_WEAKNESS, SPECIES_RESISTANCE, findMutation } from '../data/mutations';
 import { getTutorialPhase, getTutorialHint, filterMovesForTutorial, shouldUseMatchups, TUTORIAL_PHASES, SIMPLE_PUSH_OPTIONS } from '../engine/TutorialEngine';
 import { createScar, applyScarEffects, checkScarDodge, getScarDamageReduction, getScarRegenBonus, getScarCompBonus } from '../engine/ScarEngine';
@@ -435,12 +435,8 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     setPhase(PHASE.COMMITTED);
     playSound('commit');
     playSound('revealTension');
-  }
-
-  // Click to reveal moves
-  function handleRevealClick() {
-    setPhase(PHASE.REVEAL);
-    playSound('revealFlip');
+    // Auto-advance: COMMITTED → REVEAL after brief tension beat
+    setTimeout(() => { setPhase(PHASE.REVEAL); playSound('revealFlip'); }, 400);
   }
 
   // Handle item use — called when player clicks an item to use
@@ -603,27 +599,20 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     if (result.winner === 'a' || result.winner === 'both') playSound('winMatchup');
     else playSound('loseMatchup');
 
-    // Wait for player click to proceed to stamina push
-    setWaitingForClick(true);
+    // Auto-advance: REVEAL → STAMINA_PUSH after showing matchup
+    setTimeout(() => {
+      const minCost = getEffectiveCost(selectedMove, pBrokenRef.current, costModifierRef.current);
+      setStaminaPush(minCost);
+      setPhase(PHASE.STAMINA_PUSH);
+    }, 1000);
   }, [phase]);
 
-  // Click to proceed from REVEAL → STAMINA_PUSH
-  function handleRevealContinue() {
-    setWaitingForClick(false);
-    const minCost = getEffectiveCost(selectedMove, pBrokenRef.current, costModifierRef.current);
-    setStaminaPush(minCost);
-    setPhase(PHASE.STAMINA_PUSH);
-  }
-
-  // STAMINA PUSH
+  // STAMINA PUSH — auto-advance through push reveal to resolution
   function handlePushCommit() {
     playSound('pushCommit');
     setPhase(PHASE.PUSH_REVEAL);
-  }
-
-  // Click to resolve after push reveal
-  function handlePushRevealContinue() {
-    resolveTurn(selectedMove, aiMove, matchupResult.winner, staminaPush, aiStaminaPush);
+    // Auto-advance: show push values briefly, then resolve
+    setTimeout(() => resolveTurn(selectedMove, aiMove, matchupResult.winner, staminaPush, aiStaminaPush), 800);
   }
 
   // RESOLUTION
@@ -681,8 +670,16 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     const pWon = winner === 'a' || winner === 'both';
     const oWon = winner === 'b' || winner === 'both';
 
+    // === DIMINISHING PUSH RETURNS ===
+    // First 3 stamina = 1x each, additional = 0.5x each
+    // Push of 5 = 3 + (2×0.5) = 4 effective
+    function effectivePush(push) {
+      if (push <= 3) return push;
+      return 3 + (push - 3) * 0.5;
+    }
+
     // === DAMAGE CALCULATION HELPER (Channel + Keyword model) ===
-    // Step 1: raw = base × push × (Attack/50)
+    // Step 1: raw = base × effectivePush × (Attack/50)
     // Step 2: POWER channel → reduced by Defense. PSYCHIC channel → reduced by Willpower.
     // Step 3: Matchup mult from keyword chart (win=1.0, lose=0.5)
     // Step 4: Random variance × 0.85-1.0
@@ -692,7 +689,8 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       if (isVariableDmg) base = compDmgTotal;
 
       const atkMod = (attackerStats?.attack || 50) / 50;
-      let raw = isVariableDmg ? base : base * push * atkMod;
+      const ePush = effectivePush(push);
+      let raw = isVariableDmg ? base : base * ePush * atkMod;
 
       // Channel-based defensive reduction
       const channel = move.channel || 'POWER';
@@ -1214,6 +1212,20 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     newPRes.stamina = clamp(newPRes.stamina + pRegenRate, 0, STAMINA_CAP);
     newORes.stamina = clamp(newORes.stamina + oRegenRate, 0, STAMINA_CAP);
 
+    // Passive shield regen: +1 Guard and +1 Composure per turn (if not broken)
+    if (newPRes.guard > 0 && newPRes.guard < MAX_GUARD) {
+      newPRes.guard = Math.min(MAX_GUARD, newPRes.guard + GUARD_REGEN);
+    }
+    if (newPRes.composure > 0 && newPRes.composure < MAX_COMPOSURE) {
+      newPRes.composure = Math.min(MAX_COMPOSURE, newPRes.composure + COMPOSURE_REGEN);
+    }
+    if (newORes.guard > 0 && newORes.guard < MAX_GUARD) {
+      newORes.guard = Math.min(MAX_GUARD, newORes.guard + GUARD_REGEN);
+    }
+    if (newORes.composure > 0 && newORes.composure < MAX_COMPOSURE) {
+      newORes.composure = Math.min(MAX_COMPOSURE, newORes.composure + COMPOSURE_REGEN);
+    }
+
     // Bee Residual Sting passive (Sting Synthesizer tech: 2 instead of 1)
     if (playerCharKey === 'beeSwarm') {
       const stingDmg = hasTechEffect('stingBoost') ? 2 : 1;
@@ -1544,6 +1556,8 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       setAiStaminaPush(aiDecision.staminaPush);
       setMatchupResult({ winner: 'b', reason: 'You passed — opponent acts unopposed' });
       setPhase(PHASE.PUSH_REVEAL);
+      // Auto-resolve after brief display
+      setTimeout(() => resolveTurn(null, aiDecision.move, 'b', 0, aiDecision.staminaPush), 800);
     } else {
       // Both exhausted — just regen
       setPRes(prev => ({ ...prev, stamina: clamp(prev.stamina + (prev.stamina < 3 ? 1 : STAMINA_REGEN), 0, STAMINA_CAP) }));
@@ -1750,6 +1764,59 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
         )}
       </div>
 
+      {/* Active buffs/debuffs display */}
+      {(damageShield > 0 || guaranteeWin || flashBlind || scrambleActive > 0 || revealTurns > 0 || adrenalineActive || playerEntangled || playerDots.length > 0 || echoCamoTurns > 0) && (
+        <div style={{ position: 'absolute', bottom: 230, left: 8, maxWidth: 140, padding: 8, ...glassPanel, zIndex: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {damageShield > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(0, 200, 255, 0.2)', borderLeft: '3px solid #00c8ff', color: '#00c8ff', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(0, 200, 255, 0.4)' }}>
+                🛡 SHIELD ×{damageShield}
+              </div>
+            )}
+            {guaranteeWin && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(255, 200, 0, 0.2)', borderLeft: '3px solid #ffc800', color: '#ffc800', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(255, 200, 0, 0.4)' }}>
+                🎯 FOCUS
+              </div>
+            )}
+            {flashBlind && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(255, 255, 255, 0.15)', borderLeft: '3px solid #fff', color: '#ddd', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(255, 255, 255, 0.3)' }}>
+                💥 FLASH
+              </div>
+            )}
+            {scrambleActive > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(200, 0, 255, 0.2)', borderLeft: '3px solid #c800ff', color: '#d080ff', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(200, 0, 255, 0.4)' }}>
+                🌀 SCRAMBLE ×{scrambleActive}
+              </div>
+            )}
+            {revealTurns > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(0, 120, 255, 0.2)', borderLeft: '3px solid #0078ff', color: '#0078ff', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(0, 120, 255, 0.4)' }}>
+                📡 SCAN ×{revealTurns}
+              </div>
+            )}
+            {adrenalineActive && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(255, 255, 0, 0.2)', borderLeft: '3px solid #ffff00', color: '#ffff00', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(255, 255, 0, 0.4)' }}>
+                ⚡ ADRENALINE
+              </div>
+            )}
+            {echoCamoTurns > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(100, 200, 100, 0.2)', borderLeft: '3px solid #64c864', color: '#64c864', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(100, 200, 100, 0.4)' }}>
+                👻 CAMO ×{echoCamoTurns}
+              </div>
+            )}
+            {playerEntangled && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(100, 200, 100, 0.2)', borderLeft: '3px solid #64c864', color: '#64c864', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(100, 200, 100, 0.4)' }}>
+                🌿 ENTANGLED ×{playerEntangled.turnsRemaining}
+              </div>
+            )}
+            {playerDots.length > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(255, 0, 0, 0.2)', borderLeft: '3px solid #ff0000', color: '#ff4444', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(255, 0, 0, 0.4)' }}>
+                ☠ VENOM ×{playerDots.reduce((sum, dot) => sum + dot.damage, 0)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Opponent resources — right side overlay */}
       <div style={{ position: 'absolute', top: 56, right: 8, width: 140, padding: 8, ...glassPanel, zIndex: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, color: oppChar.color, textTransform: 'uppercase', letterSpacing: 1 }}>OPPONENT</div>
@@ -1867,9 +1934,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                 Targeting: {oppMutationHP[selectedTarget]?.mutation?.name}
               </div>
             )}
-            <button onClick={handleRevealClick} className="btn" style={{ marginTop: 4, padding: '8px 24px', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
-              Reveal Moves
-            </button>
+            <div style={{ fontSize: 11, color: '#4a6a7a', marginTop: 4, animation: 'pulse 1.5s infinite' }}>Revealing...</div>
           </div>
         )}
 
@@ -1897,12 +1962,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
               {matchupResult?.reason}
             </div>
 
-            {/* Click to continue from REVEAL → Stamina Push */}
-            {phase === PHASE.REVEAL && waitingForClick && (
-              <button onClick={handleRevealContinue} className="btn" style={{ marginTop: 8, padding: '8px 24px', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
-                Continue
-              </button>
-            )}
+            {/* REVEAL auto-advances to stamina push */}
 
             {/* Stamina push values + click to resolve */}
             {phase === PHASE.PUSH_REVEAL && (
@@ -1917,9 +1977,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                     <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--stamina)', fontFamily: 'var(--font-mono)' }}>{aiStaminaPush}</div>
                   </div>
                 </div>
-                <button onClick={handlePushRevealContinue} className="btn" style={{ padding: '8px 24px', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
-                  Resolve
-                </button>
+                <div style={{ fontSize: 11, color: '#4a6a7a', animation: 'pulse 1.5s infinite' }}>Resolving...</div>
               </div>
             )}
 
@@ -1956,6 +2014,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                           setStaminaPush(pushVal);
                           playSound('pushCommit');
                           setPhase(PHASE.PUSH_REVEAL);
+                          setTimeout(() => resolveTurn(selectedMove, aiMove, matchupResult.winner, pushVal, aiStaminaPush), 800);
                         }}
                         style={{ padding: '10px 20px', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', background: 'transparent', border: '1px solid var(--stamina)', borderRadius: 4, color: 'var(--stamina)' }}
                       >
@@ -2065,10 +2124,30 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                   <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? moveColor : usable ? '#fff' : 'rgba(255,255,255,0.3)' }}>
                     {displayName}
                   </div>
-                  <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 9, color: '#8899aa', marginTop: 2 }}>
                     <span style={{ color: moveColor, fontWeight: 600 }}>{TYPE_LABELS[move.moveType]}</span>
                     {' '}<span style={{ fontFamily: 'var(--font-mono)' }}>{displayCost} stm</span>
                   </div>
+                  {/* Beats / Loses hints */}
+                  {isSelected && move.keyword && (
+                    <div style={{ fontSize: 8, marginTop: 3, lineHeight: 1.4 }}>
+                      <span style={{ color: '#44ff66' }}>Beats: {
+                        Object.entries({ GRAB: 'Grab', FAST: 'Fast', AREA: 'Area', DEFENSE: 'Defense', EVASION: 'Evasion' })
+                          .filter(([k]) => {
+                            const row = { GRAB: { FAST: 'lose', DEFENSE: 'win', EVASION: 'lose' }, FAST: { GRAB: 'win', AREA: 'lose', DEFENSE: 'lose', null: 'win' }, AREA: { FAST: 'win', DEFENSE: 'lose', EVASION: 'win' }, DEFENSE: { GRAB: 'lose', FAST: 'win', AREA: 'win' }, EVASION: { GRAB: 'win', AREA: 'lose' } };
+                            return row[move.keyword]?.[k] === 'win';
+                          }).map(([, v]) => v).join(', ') || 'None'
+                      }</span>
+                      {' '}
+                      <span style={{ color: '#ff4444' }}>Loses: {
+                        Object.entries({ GRAB: 'Grab', FAST: 'Fast', AREA: 'Area', DEFENSE: 'Defense', EVASION: 'Evasion' })
+                          .filter(([k]) => {
+                            const row = { GRAB: { FAST: 'lose', DEFENSE: 'win', EVASION: 'lose' }, FAST: { GRAB: 'win', AREA: 'lose', DEFENSE: 'lose', null: 'win' }, AREA: { FAST: 'win', DEFENSE: 'lose', EVASION: 'win' }, DEFENSE: { GRAB: 'lose', FAST: 'win', AREA: 'win' }, EVASION: { GRAB: 'win', AREA: 'lose' } };
+                            return row[move.keyword]?.[k] === 'lose';
+                          }).map(([, v]) => v).join(', ') || 'None'
+                      }</span>
+                    </div>
+                  )}
                   {move.isFinisher && <div style={{ fontSize: 8, color: 'var(--lose)', fontWeight: 700, marginTop: 2 }}>FINISHER</div>}
                   {isCorrupted && <div style={{ fontSize: 8, color: 'var(--composure)', fontWeight: 700, marginTop: 1 }}>CORRUPTED?</div>}
                 </button>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import FightScreen from './screens/FightScreen';
 import CharacterSelect from './screens/CharacterSelect';
 import HubWorld2D from './screens/HubWorld2D';
@@ -8,9 +8,13 @@ import VictoryScreen from './screens/VictoryScreen';
 import DefeatScreen from './screens/DefeatScreen';
 import ScoutingScreen from './screens/ScoutingScreen';
 import IntroSequence from './screens/IntroSequence';
+import FightIntro from './screens/FightIntro';
+import SettingsScreen from './screens/SettingsScreen';
 import { characters } from './data/characters';
 import { items as allItemPool } from './data/items';
 import { playSound } from './engine/SoundManager';
+import { playMusic } from './engine/MusicManager';
+import { saveRun, loadRun, clearSave } from './engine/SaveManager';
 import { MAX_BODY, PRIZE_MONEY, TECH_CAPACITY, TECH_ENHANCEMENTS, loadMeta, saveMeta } from './data/constants';
 
 const STANDARD_SPECIES = ['cyberGorilla', 'psychoSquid', 'beeSwarm', 'terrorPinTurtle'];
@@ -52,12 +56,19 @@ export default function App() {
   const [transitioning, setTransitioning] = useState(false);
   const [scars, setScars] = useState([]);
   const [meta, setMeta] = useState(loadMeta());
+  const [showSettings, setShowSettings] = useState(false);
+  const [showFightIntro, setShowFightIntro] = useState(false);
 
   // Economy
   const [credits, setCredits] = useState(0);
   const [techPoints, setTechPoints] = useState(0);
   const [playerTech, setPlayerTech] = useState([]); // installed tech enhancement IDs
   const [techFlashMsg, setTechFlashMsg] = useState(null); // flash message for move transformations
+
+  // Play music for current screen on mount
+  useEffect(() => {
+    try { playMusic(screen); } catch (e) {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Map mutation slot names to compositor slot names
   // Mutations use 'arms'; compositor uses 'leftArm'/'rightArm'
@@ -155,6 +166,18 @@ export default function App() {
     setTimeout(() => {
       setScreen(target);
       setTransitioning(false);
+      // Trigger music for new screen
+      try { playMusic(target); } catch (e) {}
+      // Auto-save on safe screens
+      if (['overworld', 'harvest'].includes(target)) {
+        try {
+          saveRun({
+            screen: target, playerCharKey, playerMoves, mutations, biomass,
+            credits, techPoints, playerTech, items, arenaStates, arenasCleared,
+            currentArena, runStats, scars,
+          });
+        } catch (e) {}
+      }
     }, 300);
   }
 
@@ -181,11 +204,43 @@ export default function App() {
       setHubOverlay('supplies');
     } else if (targetType === 'bracket') {
       setHubOverlay('bracket');
+    } else if (targetType === 'settings') {
+      setShowSettings(true);
     }
   }
 
   function closeHubOverlay() {
     setHubOverlay(null);
+  }
+
+  // Continue a saved run
+  function handleContinueRun(save) {
+    setPlayerCharKey(save.playerCharKey);
+    setPlayerMoves(save.playerMoves || [...(characters[save.playerCharKey]?.moves || [])]);
+    setMutations(save.mutations || []);
+    setBiomass(save.biomass || 0);
+    setCredits(save.credits || 0);
+    setTechPoints(save.techPoints || 0);
+    setPlayerTech(save.playerTech || []);
+    setItems(save.items || []);
+    setArenaStates(save.arenaStates || generateArenaStates(save.playerCharKey));
+    setArenasCleared(save.arenasCleared || 0);
+    setCurrentArena(save.currentArena);
+    setRunStats(save.runStats || { totalTurns: 0, defeated: [] });
+    setScars(save.scars || []);
+    setTutorialDone(true);
+    fadeToScreen('overworld');
+  }
+
+  // Start fight with VS intro
+  function startFightWithIntro() {
+    closeHubOverlay();
+    setShowFightIntro(true);
+  }
+
+  function handleFightIntroComplete() {
+    setShowFightIntro(false);
+    fadeToScreen('fight');
   }
 
   function handleEnterArena(doorIndex) {
@@ -251,6 +306,7 @@ export default function App() {
     });
 
     if (!result.won) {
+      clearSave(); // Run over — clear save
       fadeToScreen('defeat');
       return;
     }
@@ -273,6 +329,7 @@ export default function App() {
         saveMeta(updated);
         return updated;
       });
+      clearSave(); // Run complete — clear save
       fadeToScreen('victory');
     } else {
       fadeToScreen('harvest');
@@ -314,7 +371,7 @@ export default function App() {
       )}
 
       {screen === 'select' && (
-        <CharacterSelect onSelect={startRun} meta={meta} />
+        <CharacterSelect onSelect={startRun} onContinue={handleContinueRun} meta={meta} />
       )}
 
       {/* Hub world — stays mounted during overworld, overlays render on top */}
@@ -334,7 +391,7 @@ export default function App() {
               <ScoutingScreen
                 playerCharKey={playerCharKey}
                 opponentCharKey={arenaStates[currentArena].opponent}
-                onEnter={() => { closeHubOverlay(); fadeToScreen('fight'); }}
+                onEnter={() => startFightWithIntro()}
                 onBack={closeHubOverlay}
                 codex={meta.codex}
               />
@@ -691,7 +748,7 @@ export default function App() {
         <VictoryScreen
           stats={runStats}
           mutations={mutations}
-          playerSpecies={selectedSpecies}
+          playerSpecies={playerCharKey}
           scars={scars}
           meta={meta}
           techCount={playerTech?.length || 0}
@@ -702,7 +759,7 @@ export default function App() {
       {screen === 'defeat' && (
         <DefeatScreen
           stats={runStats}
-          playerSpecies={selectedSpecies}
+          playerSpecies={playerCharKey}
           killedBy={arenaStates[currentArena]?.opponent}
           mutations={mutations}
           scars={scars}
@@ -710,6 +767,21 @@ export default function App() {
           fightNumber={currentArena != null ? currentArena + 1 : 1}
           onNewRun={() => setScreen('select')}
         />
+      )}
+
+      {/* Fight intro VS splash overlay */}
+      {showFightIntro && currentArena != null && (
+        <FightIntro
+          playerCharKey={playerCharKey}
+          opponentCharKey={arenaStates[currentArena]?.opponent}
+          fightNumber={currentArena + 1}
+          onComplete={handleFightIntroComplete}
+        />
+      )}
+
+      {/* Settings modal overlay */}
+      {showSettings && (
+        <SettingsScreen meta={meta} onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

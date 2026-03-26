@@ -1302,6 +1302,21 @@ export default function HubWorld2D({ runState, meta, arenaStates, onInteract, ov
       }}>
         wasd move / e interact
       </div>
+
+      {/* Settings gear button */}
+      <button
+        onClick={() => onInteract('settings')}
+        style={{
+          position: 'absolute', top: 10, right: 10, zIndex: 5,
+          background: 'rgba(5,10,20,0.6)', border: '1px solid #1a2a3a',
+          color: '#4a6a7a', fontSize: 14, cursor: 'pointer',
+          width: 32, height: 32, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', padding: 0,
+        }}
+        title="Settings"
+      >
+        &#9881;
+      </button>
     </div>
   );
 }

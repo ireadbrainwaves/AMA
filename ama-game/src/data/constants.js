@@ -1,11 +1,15 @@
 // Resource pool defaults
-export const MAX_GUARD = 20;
-export const MAX_COMPOSURE = 20;
-export const MAX_BODY = 25;
+export const MAX_GUARD = 25;
+export const MAX_COMPOSURE = 25;
+export const MAX_BODY = 30;
 export const MAX_STAMINA = 10;
-export const STAMINA_REGEN = 3;
+export const STAMINA_REGEN = 2;  // Nerfed from 3 — stamina is a real resource now
 export const STAMINA_CAP = MAX_STAMINA;
 export const MAX_TURNS = 20;
+
+// Passive shield regen per turn
+export const GUARD_REGEN = 1;
+export const COMPOSURE_REGEN = 1;
 
 export const INITIAL_RESOURCES = {
   guard: MAX_GUARD,
@@ -14,11 +18,11 @@ export const INITIAL_RESOURCES = {
   stamina: MAX_STAMINA,
 };
 
-// Between-fight healing (spec: Guard/Comp/Stamina full, Body +5)
+// Between-fight healing (Guard/Comp/Stamina full, Body +8)
 export const BETWEEN_FIGHT_HEAL = {
   guard: MAX_GUARD,
   composure: MAX_COMPOSURE,
-  body: 5,                // Partial — Body is the permanent scar
+  body: 8,                // Partial — Body is the permanent scar
   stamina: MAX_STAMINA,
 };
 
