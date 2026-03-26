@@ -1105,3 +1105,130 @@ Modified:
   src/screens/DoctorScreen.jsx — Enhance tab, tech purchase UI, tech computed values
   src/screens/HubWorld2D.jsx   — Ark NPC (RK-7), amber light source, custom rendering
 ```
+
+---
+
+## Session 3 — Sprites, Mutations, Tech Visuals, Items Rework, Victory/Defeat Screens
+
+### What was built
+
+#### Pixi v8 Sprite Migration
+- Converted `CharacterCompositor.loadBase()` and `attachMutation()` from deprecated sync `PIXI.Texture.from()` to async `PIXI.Assets.load()` for Pixi v8 compatibility
+- Changed sprite anchor from center (0.5, 0.5) to bottom-center (0.5, 1.0) so feet align with `CHAR_GROUND_Y`
+- Reduced character scale from 1.0 to 0.85 on the 960x540 canvas
+- Updated `BattleArena.jsx` to `await` all sprite loading with `Promise.all` for mutations
+
+#### Base Character Sprites (11 PNGs)
+All 7 species processed from 928x1232 originals to 120x160 RGBA with flood-fill background removal (per-sprite tuned tolerance 50-70). Dark gritty art style preserved — rejected the 2048x2048 "v2" versions which had completely different aesthetics.
+
+Files in `src/assets/sprites/`:
+- cyberGorilla_front.png, cyberGorilla_back.png
+- psychoSquid_front.png, psychoSquid_back.png
+- beeSwarm_front.png, beeSwarm_back.png
+- terrorPinTurtle_front.png, terrorPinTurtle_back.png
+- echomorph_front.png, hydravine_front.png, parasitex_front.png
+
+#### Mutation Overlay Sprites (27 PNGs)
+Generated all 27 mutation overlays as pixel art with species-specific color palettes, gritty texture, highlight scatter, and glow edges. Sized per body slot (head: 40x36, arms: 32x40, chest: 44x40, legs: 40x32, back: 48x44).
+
+Served from `public/assets/mutations/MUT_{mutationId}_front.png` — matches `getMutationSpritePath()` URL pattern.
+
+Species mutations:
+- **Cyber Gorilla (4):** iron_knuckles (metal fist plates), thick_skull (reinforced dome), barrel_chest (ribcage armor), ground_stomp (impact legs)
+- **Psycho Squid (4):** tentacle_graft (curling tentacles), psionic_lobe (glowing brain), chromatophore_skin (color-shifting spots), jet_siphon (propulsion tubes)
+- **Bee Swarm (4):** stinger_arms (striped venom blades), hive_mind_node (hexagonal hive), honeycomb_plating (chitin hex armor), wing_cluster (insect wings)
+- **Terror Pin Turtle (4):** shell_gauntlets (layered shell), iron_dome (concentric dome), shell_plate (scute pattern), anchor_legs (rooted columns)
+- **Echomorph (3):** adaptive_membrane (phase-shift colors), mirror_reflex (crystalline shimmer), echo_core (concentric pulse rings)
+- **Hydravine (3):** regenerative_membrane (healing veins), thorn_bark (thorny bark), root_network (spreading roots)
+- **Parasitex (3):** parasitic_link (tendril mass + core eye), chitin_exoframe (segmented exoskeleton), assimilation_tendril (writhing tendrils)
+- **Doctor (2):** adrenaline_glands (bio-tech injector), ink_sacs (squid ink pouches)
+
+#### Tech Enhancement Visual System
+Upgraded `addTechGlow()` in CharacterCompositor from a single cyan glow to a category-specific dual-layer system:
+
+| Category  | Color     | Hex      | Alpha | Scale | Pulse Speed |
+|-----------|-----------|----------|-------|-------|-------------|
+| Offensive | Red       | 0xff4444 | 0.45  | 1.18  | 0.06        |
+| Defensive | Blue      | 0x44aaff | 0.35  | 1.22  | 0.03        |
+| Utility   | Green     | 0x44ff88 | 0.35  | 1.15  | 0.05        |
+| Passive   | Amber     | 0xffaa00 | 0.30  | 1.12  | 0.02        |
+| Starter   | Magenta   | 0xff44ff | 0.40  | 1.20  | 0.04        |
+
+Each tech renders: outer glow (scaled +0.08, 40% alpha) + inner glow (category alpha) + floating tech icon above mutation. All glows use additive blend mode with animated pulsing via `requestAnimationFrame`.
+
+#### Tech Icon Sprites (22 PNGs)
+Generated 20x20 pixel art icons in `public/assets/tech/`:
+- 5 category icons: offensive (red blade), defensive (blue shield), utility (green gear), passive (amber crystal), starter (magenta lightning)
+- 17 individual tech icons: plasma_coating, venom_injector, neural_scrambler, titanium_reinforcement, shock_plating, auto_repair_nanites, quick_release, tracking_software, overclock, momentum_capacitor, paranoia_amplifier, sting_synthesizer, tax_collector, rocket_fist, synapse_swap, hive_thrusters, spike_plating
+
+BattleArena updated to pass `getTechCategory(techId)` and `techId` to `addTechGlow()`.
+
+#### Items System Rework
+Expanded from 4 basic items to 15 items across 4 categories with rarity-based pricing:
+
+**Restore (green):**
+- Stamina Serum (common, 1 bio) — +5 Stamina
+- Guard Patch (common, 1 bio) — +5 Guard
+- Composure Stim (common, 1 bio) — +5 Composure
+- Biofoam Canister (uncommon, 2 bio) — +4 Body
+- Full Restore (rare, 3 bio) — +3 to all resources
+
+**Buff (amber):**
+- Adrenaline Shot (uncommon, 2 bio) — next attack double damage
+- Iron Skin Vial (uncommon, 2 bio) — absorbs next 3 incoming damage
+- Focus Lens (rare, 3 bio) — next matchup auto-wins
+
+**Disrupt (red):**
+- Flash Grenade (common, 1 bio) — opponent deals 0 damage this turn
+- Scramble Dart (uncommon, 2 bio) — forces random AI moves for 2 turns
+- Corrosive Spray (uncommon, 2 bio) — 2 damage to opponent's weakest mutation
+
+**Tactical (blue):**
+- Smoke Bomb (common, 1 bio) — use item without losing your turn
+- Mutation Repair Kit (rare, 3 bio) — +5 HP to most damaged mutation
+- Scanner Pulse (common, 1 bio) — see opponent's exact move for 3 turns
+
+New FightScreen state: `damageShield`, `guaranteeWin`, `flashBlind`, `scrambleActive`, `revealTurns`. All effects wired into combat resolution, AI decision flow, and matchup resolution. Fixed race condition where old item UI called `setSelectedItem` + `handleItemCommit` in same click (state never updated).
+
+Doctor shop updated: 3 offerings (2 common + 1 uncommon/rare), rarity colors, category border colors, flavor text, icons.
+
+#### Victory Screen (Complete Rewrite)
+New `VictoryScreen.jsx` — phased animation with:
+- Green radial glow background + scanline overlay
+- Gradient text title ("CHAMPION") with drop shadow
+- Stats grid: fights won, total turns, avg turns/fight, scars, tech installed
+- "NEW PERSONAL BEST" badge
+- Defeated opponents with species colors
+- Grafted mutations list
+- Contextual Commander Vex quotes (flawless, no scars, speed run, veteran, etc.)
+- Hover effects on New Run button
+
+#### Defeat Screen (New Component)
+Extracted from inline App.jsx to dedicated `DefeatScreen.jsx`:
+- Red-tinted radial background + vignette + scanlines
+- Glitch effect on title appearance
+- Shows killer species name
+- Run summary: fights survived, total turns, fight number, scars
+- Defeated opponents + mutations at time of death
+- Career record grid (runs/wins/losses)
+- Contextual Vex quotes based on killer species, fight number, career stats
+- "Try Again" button with hover state
+
+### File changes
+```
+New:
+  src/screens/DefeatScreen.jsx                      — Full defeat screen component
+  public/assets/mutations/MUT_*_front.png (x27)     — Mutation overlay sprites
+  public/assets/tech/TECH_*_icon.png (x22)          — Tech enhancement icons
+
+Modified:
+  src/data/items.js                                  — 15 items, 4 categories, rarity, icons, flavor text, helpers
+  src/rendering/CharacterCompositor.js               — Async Pixi v8, bottom-center anchor, category-specific addTechGlow with dual glow + icon + pulse animation
+  src/components/BattleArena.jsx                     — Async sprite loading, await mutations, getTechCategory pass-through, TECH_ENHANCEMENTS import
+  src/screens/FightScreen.jsx                        — New item effects (damageShield, guaranteeWin, flashBlind, scrambleActive, revealTurns, corrosive, repairMutation, freeItem), scramble AI override, focus lens matchup override, scanner reveal display, fixed item use race condition
+  src/screens/VictoryScreen.jsx                      — Complete rewrite with phased animation, stats, Vex quotes
+  src/screens/DoctorScreen.jsx                       — Rarity-based item pricing, category colors, flavor text, getShopOfferings import
+  src/App.jsx                                        — DefeatScreen import, expanded VictoryScreen props (playerSpecies, scars, meta, techCount), DefeatScreen props (killedBy, fightNumber, etc.)
+  src/data/spriteMap.js                              — Vite imports for all 11 base sprites
+  src/data/slotOffsets.js                            — Per-species slot offsets for mutation positioning
+```

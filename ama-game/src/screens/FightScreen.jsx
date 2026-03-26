@@ -65,6 +65,11 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
   const [costModifier, setCostModifier] = useState(0); // from Iron Grip
   const [aiCostModifier, setAiCostModifier] = useState(0);
   const [adrenalineActive, setAdrenalineActive] = useState(false);
+  const [damageShield, setDamageShield] = useState(0);         // absorbs next N incoming damage
+  const [guaranteeWin, setGuaranteeWin] = useState(false);     // next matchup auto-wins
+  const [flashBlind, setFlashBlind] = useState(false);          // opponent deals 0 this turn
+  const [scrambleActive, setScrambleActive] = useState(0);      // turns of forced random AI
+  const [revealTurns, setRevealTurns] = useState(0);            // turns of seeing opponent's move
 
   // Tutorial state
   const isTutorial = isFirstFight === true;
@@ -101,6 +106,14 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
   // Ghost move from Hydravine Spore Cloud
   const [ghostMove, setGhostMove] = useState(null);
+
+  // Click-to-continue: tracks whether player has clicked through auto-advance phases
+  const [waitingForClick, setWaitingForClick] = useState(false);
+  // Previous turn's log persists into next MOVE_SELECT
+  const [prevTurnLog, setPrevTurnLog] = useState([]);
+  // Resource change indicators: { guard: -3, composure: 0, body: -5, stamina: +2 }
+  const [pResChanges, setPResChanges] = useState({});
+  const [oResChanges, setOResChanges] = useState({});
 
   // Parasitex phase tracking
   const [parasitexStolenCount, setParasitexStolenCount] = useState(0);
@@ -249,6 +262,16 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     stamina: oRes.stamina < 3,
   };
 
+  // Refs for values accessed inside setTimeout closures to avoid stale reads
+  const pBrokenRef = useRef(pBroken);
+  pBrokenRef.current = pBroken;
+  const costModifierRef = useRef(costModifier);
+  costModifierRef.current = costModifier;
+  const pResRef = useRef(pRes);
+  pResRef.current = pRes;
+  const oResRef = useRef(oRes);
+  oResRef.current = oRes;
+
   // Calculate effective cost for a move considering broken states and modifiers
   function getEffectiveCost(move, broken, modifier) {
     let cost = move.minCost;
@@ -277,6 +300,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     switch (move.finisherCondition) {
       case 'opponentGuardBroken': return oppResources.guard <= 0;
       case 'opponentComposureBroken': return oppResources.composure <= 0;
+      case 'opponentArmorBroken': return oppResources.guard <= 0 || oppResources.composure <= 0;
       case 'opponentStaminaLow': return oppResources.stamina < 3;
       case 'hasStolenMutation': return oppStolenMoves.length > 0;
       default: return false;
@@ -379,13 +403,21 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       return;
     }
 
-    // AI decision
-    const aiDecision = getAIDecision(
-      opponentCharKey,
-      getAIMoves(),
-      oRes, pRes,
-      getAIFightState()
-    );
+    // AI decision — scramble overrides AI with random move
+    let aiDecision;
+    const aiMoves = getAIMoves();
+    if (scrambleActive > 0 && aiMoves.length > 0) {
+      const randomMove = aiMoves[Math.floor(Math.random() * aiMoves.length)];
+      aiDecision = { move: randomMove, staminaPush: Math.min(2, oRes.stamina), intent: 'scrambled' };
+      setScrambleActive(prev => prev - 1);
+    } else {
+      aiDecision = getAIDecision(
+        opponentCharKey,
+        aiMoves,
+        oRes, pRes,
+        getAIFightState()
+      );
+    }
 
     if (!aiDecision) {
       // AI has no affordable moves — auto-lose
@@ -402,53 +434,138 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     setOppIntent(displayIntent);
     setPhase(PHASE.COMMITTED);
     playSound('commit');
-
-    // Committed pause — tension beat
     playSound('revealTension');
-    setTimeout(() => { setPhase(PHASE.REVEAL); playSound('revealFlip'); }, 500);
   }
 
-  // Handle item use
-  function handleItemCommit() {
-    if (!selectedItem) return;
+  // Click to reveal moves
+  function handleRevealClick() {
+    setPhase(PHASE.REVEAL);
+    playSound('revealFlip');
+  }
 
-    // AI still picks a move
-    const aiDecision = getAIDecision(
-      opponentCharKey,
-      getAIMoves(),
-      oRes, pRes, getAIFightState()
-    );
+  // Handle item use — called when player clicks an item to use
+  function handleItemUse(item) {
+    if (!item) return;
+    const isFreeItem = item.effect === 'freeItem'; // Smoke Bomb: no opponent turn
 
-    if (aiDecision) {
-      setAiMove(aiDecision.move);
-      setAiStaminaPush(aiDecision.staminaPush);
+    // AI still picks a move (unless it's a free item)
+    let aiDecision = null;
+    if (!isFreeItem) {
+      aiDecision = getAIDecision(
+        opponentCharKey,
+        getAIMoves(),
+        oRes, pRes, getAIFightState()
+      );
+      if (aiDecision) {
+        setAiMove(aiDecision.move);
+        setAiStaminaPush(aiDecision.staminaPush);
+      }
     }
 
-    // Apply item
-    const item = selectedItem;
-    setPRes(prev => {
-      const next = { ...prev };
-      switch (item.effect) {
-        case 'restoreStamina': next.stamina = clamp(next.stamina + item.value, 0, STAMINA_CAP); break;
-        case 'restoreGuard': next.guard = clamp(next.guard + item.value, 0, MAX_GUARD); break;
-        case 'restoreComposure': next.composure = clamp(next.composure + item.value, 0, MAX_COMPOSURE); break;
-        case 'doubleDamage': setAdrenalineActive(true); break;
+    // Apply item effect
+    const log = [];
+    switch (item.effect) {
+      case 'restoreStamina':
+        setPRes(prev => ({ ...prev, stamina: clamp(prev.stamina + item.value, 0, STAMINA_CAP) }));
+        log.push(`+${item.value} Stamina`);
+        break;
+      case 'restoreGuard':
+        setPRes(prev => ({ ...prev, guard: clamp(prev.guard + item.value, 0, MAX_GUARD) }));
+        log.push(`+${item.value} Guard`);
+        break;
+      case 'restoreComposure':
+        setPRes(prev => ({ ...prev, composure: clamp(prev.composure + item.value, 0, MAX_COMPOSURE) }));
+        log.push(`+${item.value} Composure`);
+        break;
+      case 'restoreBody':
+        setPRes(prev => ({ ...prev, body: clamp(prev.body + item.value, 0, MAX_BODY) }));
+        log.push(`+${item.value} Body`);
+        break;
+      case 'restoreAll':
+        setPRes(prev => ({
+          ...prev,
+          guard: clamp(prev.guard + item.value, 0, MAX_GUARD),
+          composure: clamp(prev.composure + item.value, 0, MAX_COMPOSURE),
+          body: clamp(prev.body + item.value, 0, MAX_BODY),
+          stamina: clamp(prev.stamina + item.value, 0, STAMINA_CAP),
+        }));
+        log.push(`+${item.value} to all resources`);
+        break;
+      case 'doubleDamage':
+        setAdrenalineActive(true);
+        log.push('Next attack deals DOUBLE damage');
+        break;
+      case 'damageShield':
+        setDamageShield(prev => prev + item.value);
+        log.push(`Damage shield: absorbs next ${item.value} damage`);
+        break;
+      case 'guaranteeWin':
+        setGuaranteeWin(true);
+        log.push('Next matchup: GUARANTEED WIN');
+        break;
+      case 'skipOpponentTurn':
+        setFlashBlind(true);
+        log.push('Flash! Opponent deals 0 damage this turn');
+        break;
+      case 'scrambleOpponent':
+        setScrambleActive(prev => prev + item.value);
+        log.push(`Scrambled! Opponent uses random moves for ${item.value} turns`);
+        break;
+      case 'corrosive': {
+        // Deal damage to opponent's most damaged mutation
+        const activeMuts = Object.entries(oMutHP).filter(([, hp]) => hp > 0);
+        if (activeMuts.length > 0) {
+          const [targetMut] = activeMuts.sort((a, b) => a[1] - b[1]);
+          setOMutHP(prev => ({
+            ...prev,
+            [targetMut[0]]: Math.max(0, prev[targetMut[0]] - item.value),
+          }));
+          log.push(`Corrosive: -${item.value} HP to mutation`);
+        } else {
+          // No mutations — deal Body damage instead
+          setORes(prev => ({ ...prev, body: Math.max(0, prev.body - item.value) }));
+          log.push(`Corrosive: -${item.value} Body (no mutations)`);
+        }
+        break;
       }
-      return next;
-    });
+      case 'freeItem':
+        // Smoke Bomb — item is "free", no opponent turn happens
+        log.push('Smoke cover! No turn lost');
+        break;
+      case 'repairMutation': {
+        // Repair most damaged player mutation
+        const pMuts = Object.entries(pMutHP).filter(([, hp]) => hp > 0 && hp < 99);
+        if (pMuts.length > 0) {
+          const [targetMut] = pMuts.sort((a, b) => a[1] - b[1]);
+          setPMutHP(prev => ({
+            ...prev,
+            [targetMut[0]]: prev[targetMut[0]] + item.value,
+          }));
+          log.push(`Mutation repaired: +${item.value} HP`);
+        }
+        break;
+      }
+      case 'revealIntent':
+        setRevealTurns(prev => prev + item.value);
+        log.push(`Scanner active for ${item.value} turns`);
+        break;
+    }
 
+    // Log the item use
+    setTurnLog(prev => [...prev, `Used ${item.name}: ${log.join(', ')}`]);
+
+    // Consume the item
     onItemUsed(item.id);
     setSelectedItem(null);
     setShowItems(false);
 
-    // Opponent's move lands unopposed
-    if (aiDecision) {
+    if (isFreeItem) {
+      // Smoke Bomb — skip to next turn without opponent attacking
+      endTurn();
+    } else if (aiDecision) {
+      // Opponent's move lands unopposed
       setMatchupResult({ winner: 'b', reason: `Item used — ${aiDecision.move.name} lands unopposed` });
-      setPhase(PHASE.COMMITTED);
-      setTimeout(() => {
-        setPhase(PHASE.PUSH_REVEAL);
-        setTimeout(() => resolveTurn(null, aiDecision.move, 'b', 0, aiDecision.staminaPush), 800);
-      }, 500);
+      setPhase(PHASE.PUSH_REVEAL);
     } else {
       endTurn();
     }
@@ -461,9 +578,15 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
     // In tutorial Phase A, no matchups — both always land
     const useMatchups = shouldUseMatchups(tutorialPhase);
-    const result = useMatchups
+    let result = useMatchups
       ? resolveMatchup(selectedMove, aiMove)
       : { winner: 'both', reason: 'Both land!', typeReason: null };
+
+    // Focus Lens: guarantee player wins this matchup
+    if (guaranteeWin && result.winner !== 'a') {
+      result = { winner: 'a', reason: 'Focus Lens override — guaranteed win!', typeReason: null };
+      setGuaranteeWin(false);
+    }
     setMatchupResult(result);
 
     // Tutorial hints on matchup result
@@ -480,19 +603,27 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     if (result.winner === 'a' || result.winner === 'both') playSound('winMatchup');
     else playSound('loseMatchup');
 
-    setTimeout(() => {
-      // Both sides always push stamina (loser deals half damage)
-      const minCost = getEffectiveCost(selectedMove, pBroken, costModifier);
-      setStaminaPush(minCost);
-      setPhase(PHASE.STAMINA_PUSH);
-    }, 2000);
+    // Wait for player click to proceed to stamina push
+    setWaitingForClick(true);
   }, [phase]);
+
+  // Click to proceed from REVEAL → STAMINA_PUSH
+  function handleRevealContinue() {
+    setWaitingForClick(false);
+    const minCost = getEffectiveCost(selectedMove, pBrokenRef.current, costModifierRef.current);
+    setStaminaPush(minCost);
+    setPhase(PHASE.STAMINA_PUSH);
+  }
 
   // STAMINA PUSH
   function handlePushCommit() {
     playSound('pushCommit');
     setPhase(PHASE.PUSH_REVEAL);
-    setTimeout(() => resolveTurn(selectedMove, aiMove, matchupResult.winner, staminaPush, aiStaminaPush), 800);
+  }
+
+  // Click to resolve after push reveal
+  function handlePushRevealContinue() {
+    resolveTurn(selectedMove, aiMove, matchupResult.winner, staminaPush, aiStaminaPush);
   }
 
   // RESOLUTION
@@ -550,30 +681,123 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     const pWon = winner === 'a' || winner === 'both';
     const oWon = winner === 'b' || winner === 'both';
 
-    // === DAMAGE CALCULATION HELPER ===
-    // Implements spec formula: raw = base × push × (Attack/50), reduced = raw × (50/Defense or Willpower)
-    // Plus random variance × 0.85-1.0
+    // === DAMAGE CALCULATION HELPER (Channel + Keyword model) ===
+    // Step 1: raw = base × push × (Attack/50)
+    // Step 2: POWER channel → reduced by Defense. PSYCHIC channel → reduced by Willpower.
+    // Step 3: Matchup mult from keyword chart (win=1.0, lose=0.5)
+    // Step 4: Random variance × 0.85-1.0
     function calcDamage(move, push, attackerStats, defenderStats, wonMatchup, isVariableDmg, compDmgTotal) {
       if (!move || push <= 0) return 0;
       let base = move.baseDamage;
       if (isVariableDmg) base = compDmgTotal;
 
-      // Step 1: Raw damage = base × push × (Attack / 50)
       const atkMod = (attackerStats?.attack || 50) / 50;
       let raw = isVariableDmg ? base : base * push * atkMod;
 
-      // Step 2: Defensive reduction
+      // Channel-based defensive reduction
+      const channel = move.channel || 'POWER';
       let defStat = defenderStats?.defense || 50;
-      if (move.moveType === 'psychic') defStat = defenderStats?.willpower || 50;
+      if (channel === 'PSYCHIC') defStat = defenderStats?.willpower || 50;
+      if (channel === 'FINISHER') defStat = defenderStats?.defense || 50; // finishers still reduced by defense
       const reduced = raw * (50 / Math.max(1, defStat));
 
-      // Matchup multiplier: loser deals half
       const matchMult = wonMatchup ? 1 : 0.5;
-
-      // Step 5: Random variance × 0.85-1.0
       const variance = 0.85 + Math.random() * 0.15;
 
       return Math.max(1, Math.floor(reduced * matchMult * variance));
+    }
+
+    // === CHANNEL ROUTING HELPER ===
+    // Routes damage based on channel: POWER→Guard (overflow to Body), PSYCHIC→Composure (overflow to Body), FINISHER→Body direct
+    function routeChannelDamage(dmg, move, targetRes, mutHPMap, log, destroyedList, isPlayer) {
+      const channel = move.channel || 'POWER';
+
+      // SELF channel: no damage
+      if (channel === 'SELF') return;
+
+      // FINISHER: bypass everything, direct Body
+      if (channel === 'FINISHER') {
+        if (isPlayer) {
+          newORes.body = Math.max(0, newORes.body - dmg);
+          log.push(`${move.name}: ${dmg} Body (FINISHER — direct hit)`);
+        } else {
+          newPRes.body = Math.max(0, newPRes.body - dmg);
+          log.push(`${move.name}: ${dmg} Body to you (FINISHER)`);
+        }
+        return;
+      }
+
+      // POWER → Guard. PSYCHIC → Composure.
+      const armorResource = channel === 'PSYCHIC' ? 'composure' : 'guard';
+      const armorMax = channel === 'PSYCHIC' ? MAX_COMPOSURE : MAX_GUARD;
+      const currentArmor = isPlayer ? newORes[armorResource] : newPRes[armorResource];
+
+      // Check if armor is already broken — damage goes straight to Body
+      if (currentArmor <= 0) {
+        if (isPlayer) {
+          newORes.body = Math.max(0, newORes.body - dmg);
+          log.push(`${move.name}: ${dmg} Body (${armorResource} BROKEN — direct hit)`);
+        } else {
+          newPRes.body = Math.max(0, newPRes.body - dmg);
+          log.push(`${move.name}: ${dmg} Body to you (${armorResource} broken)`);
+        }
+        return;
+      }
+
+      // Check for mutation shield on this armor layer
+      const shieldSlot = channel === 'PSYCHIC' ? 'composure' : 'guard';
+      const shieldEntry = Object.entries(mutHPMap).find(([, v]) => v.shieldFor === shieldSlot && v.currentHP > 0);
+
+      if (shieldEntry) {
+        const [, mut] = shieldEntry;
+        let mutDmg = dmg;
+        // Weakness/resistance
+        if (mut.weakness && move.moveType === mut.weakness) { mutDmg = Math.floor(dmg * 1.5); log.push(`WEAK! (+50%)`); }
+        if (mut.resistance && move.moveType === mut.resistance) { mutDmg = Math.floor(dmg * 0.75); log.push(`Resisted! (-25%)`); }
+        // GRAB keyword: +50% to mutation HP
+        if (move.keyword === 'GRAB') { mutDmg = Math.floor(mutDmg * 1.5); log.push('GRAB: +50% to mutation'); }
+
+        const before = mut.currentHP;
+        mut.currentHP = Math.max(0, mut.currentHP - mutDmg);
+        if (mut.revealed !== undefined) mut.revealed = true;
+        log.push(`${move.name}: ${Math.min(mutDmg, before)} to ${mut.mutation.name} (${mut.currentHP}/${mut.maxHP})`);
+
+        if (mut.currentHP <= 0) {
+          const overkill = mutDmg - before;
+          // Overkill goes to armor resource
+          if (overkill > 0) {
+            applyArmorDamage(overkill, armorResource, isPlayer, log, 'ARMOR BREAK');
+          }
+          if (before > 0) { destroyedList.push(mut.mutation); log.push(`MUTATION DESTROYED: ${mut.mutation.name}!`); }
+        }
+        return;
+      }
+
+      // No mutation shield — apply to armor resource with overflow to Body
+      applyArmorDamage(dmg, armorResource, isPlayer, log, move.name);
+    }
+
+    // Apply damage to armor (Guard/Composure) with overflow to Body on break
+    function applyArmorDamage(dmg, resource, isPlayer, log, source) {
+      const res = isPlayer ? newORes : newPRes;
+      const current = res[resource];
+      const suffix = isPlayer ? '' : ' to you';
+
+      if (dmg >= current && current > 0) {
+        // Breaking hit — overflow to Body
+        const overflow = dmg - current;
+        res[resource] = 0;
+        log.push(`${source}: ${current} ${resource}${suffix} — ${resource.toUpperCase()} BROKEN!`);
+        if (overflow > 0) {
+          res.body = Math.max(0, res.body - overflow);
+          log.push(`Overflow: ${overflow} Body${suffix}`);
+        }
+        if (resource === 'composure') newTotalCompDmg += current;
+      } else {
+        res[resource] = Math.max(0, res[resource] - dmg);
+        log.push(`${source}: ${dmg} ${resource}${suffix}`);
+        if (resource === 'composure') newTotalCompDmg += dmg;
+      }
     }
 
     // Helper: find mutation shielding a resource
@@ -607,7 +831,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
           log.push(`Resisted! ${move.moveType} vs ${mut.resistance} (-25%)`);
         }
         // Grab bonus: +50% to mutation HP
-        if (move.moveType === 'grab') {
+        if (move.keyword === 'GRAB') {
           mutDmg = Math.floor(mutDmg * 1.5);
           log.push('Grab: +50% to mutation HP');
         }
@@ -688,8 +912,8 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       // Calculate base damage via spec formula
       let dmg = calcDamage({ ...pMove, baseDamage: baseDmg }, pPush, pStats, oStats, pWon, isVariableDmg, totalCompDamage);
 
-      // Gorilla Momentum bonus
-      if (playerCharKey === 'cyberGorilla' && (pMove.target === 'guard' || pMove.target === 'guard+composure') && pWon) {
+      // Gorilla Momentum bonus (POWER channel = Guard pressure)
+      if (playerCharKey === 'cyberGorilla' && pMove.channel === 'POWER' && pWon) {
         dmg += Math.floor(newMomentum * pMove.baseDamage * (pStats.attack / 50));
       }
 
@@ -717,105 +941,64 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
       if (!pWon) log.push('(Half damage — lost matchup)');
 
-      // === SPECIAL MECHANICS ===
+      // === CHANNEL-BASED DAMAGE ROUTING ===
 
-      // Rocket Fist / Split Pierce: split damage between Guard and Body
-      if (pMove.effect === 'splitPierce' || pMove.target === 'guard+body') {
+      // Special mechanics first (Rocket Fist, Hive Thrusters, Synapse Swap)
+      if (pMove.effect === 'splitPierce') {
+        // Rocket Fist: split evenly between Guard and Body (both through Defense)
         const guardDmg = Math.ceil(dmg / 2);
         const bodyDmg = Math.floor(dmg / 2);
-        applyDamageToResource(guardDmg, 'guard', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-        applyDamageToResource(bodyDmg, 'body', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-      }
-      // Hive Thrusters / Double Hit: run damage twice at half each
-      else if (pMove.effect === 'doubleHit') {
+        applyArmorDamage(guardDmg, 'guard', true, log, pMove.name + ' (Guard)');
+        newORes.body = Math.max(0, newORes.body - bodyDmg);
+        log.push(`${pMove.name} (Body): ${bodyDmg} Body`);
+      } else if (pMove.effect === 'doubleHit') {
+        // Hive Thrusters: route through channel twice at half
         const halfDmg = Math.max(1, Math.ceil(dmg / 2));
         for (let hit = 0; hit < 2; hit++) {
           log.push(`Hit ${hit + 1}:`);
-          applyDamageToResource(halfDmg, 'body', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
+          routeChannelDamage(halfDmg, pMove, newORes, newOppMutHP, log, oppMutationsDestroyedThisTurn, true);
         }
-      }
-      // Synapse Swap: on hit, swap 2 random opponent moves
-      else if (pMove.effect === 'synapseSwap' && pWon && oppChar.moves.length >= 2) {
+      } else if (pMove.effect === 'synapseSwap' && pWon && oppChar.moves.length >= 2) {
+        // Synapse Swap: apply PSYCHIC damage normally + swap moves
         const indices = oppChar.moves.map((_, i) => i).sort(() => Math.random() - 0.5);
         setOppSwappedMoves([indices[0], indices[1]]);
         log.push(`Synapse Swap: ${oppChar.moves[indices[0]].name} ↔ ${oppChar.moves[indices[1]].name} swapped!`);
-        // Still apply composure damage normally
-        applyDamageToResource(dmg, 'composure', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-      }
-      // Area splash: primary target + 1 damage to random alive mutation
-      else if (pMove.effect === 'areaSplash') {
-        // Primary damage to body
-        applyDamageToResource(dmg, 'body', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-        // Splash 1 damage to a random alive mutation
-        const aliveMuts = Object.entries(newOppMutHP).filter(([, v]) => v.currentHP > 0);
-        if (aliveMuts.length > 0) {
-          const [splashId, splashMut] = aliveMuts[Math.floor(Math.random() * aliveMuts.length)];
-          splashMut.currentHP = Math.max(0, splashMut.currentHP - 1);
-          log.push(`Area Splash: 1 damage to ${splashMut.mutation.name}`);
-          if (splashMut.currentHP <= 0) {
-            oppMutationsDestroyedThisTurn.push(splashMut.mutation);
-            log.push(`MUTATION DESTROYED: ${splashMut.mutation.name}!`);
-          }
-        }
-      }
-      // Player targeting a specific mutation
-      else if (selectedTarget && selectedTarget !== 'body' && newOppMutHP[selectedTarget] && newOppMutHP[selectedTarget].currentHP > 0) {
+        routeChannelDamage(dmg, pMove, newORes, newOppMutHP, log, oppMutationsDestroyedThisTurn, true);
+      } else if (selectedTarget && selectedTarget !== 'body' && newOppMutHP[selectedTarget] && newOppMutHP[selectedTarget].currentHP > 0) {
+        // Player targeting a specific mutation directly
         const targetMut = newOppMutHP[selectedTarget];
         let mutDmg = dmg;
-        if (targetMut.weakness && pMove.moveType === targetMut.weakness) {
-          mutDmg = Math.floor(dmg * 1.5);
-          log.push(`WEAK! ${pMove.moveType} vs ${targetMut.weakness} (+50%)`);
-        }
-        if (targetMut.resistance && pMove.moveType === targetMut.resistance) {
-          mutDmg = Math.floor(dmg * 0.75);
-          log.push(`Resisted! (-25%)`);
-        }
-        if (pMove.moveType === 'grab') {
-          mutDmg = Math.floor(mutDmg * 1.5);
-          log.push('Grab: +50% to mutation HP');
-        }
+        if (targetMut.weakness && pMove.moveType === targetMut.weakness) { mutDmg = Math.floor(dmg * 1.5); log.push(`WEAK! (+50%)`); }
+        if (targetMut.resistance && pMove.moveType === targetMut.resistance) { mutDmg = Math.floor(dmg * 0.75); log.push(`Resisted! (-25%)`); }
+        if (pMove.keyword === 'GRAB') { mutDmg = Math.floor(mutDmg * 1.5); log.push('GRAB: +50% to mutation'); }
         const beforeHP = targetMut.currentHP;
         targetMut.currentHP = Math.max(0, targetMut.currentHP - mutDmg);
         targetMut.revealed = true;
         log.push(`${pMove.name}: ${Math.min(mutDmg, beforeHP)} to ${targetMut.mutation.name} (${targetMut.currentHP}/${targetMut.maxHP})`);
-        // Armor break overkill
         if (targetMut.currentHP <= 0 && mutDmg > beforeHP) {
           const overkill = mutDmg - beforeHP;
-          const resTarget = pMove.target === 'composure' ? 'composure' : pMove.target === 'guard' ? 'guard' : 'body';
-          applyResourceDirect(overkill, resTarget, log, 'ARMOR BREAK');
+          const resTarget = pMove.channel === 'PSYCHIC' ? 'composure' : 'guard';
+          applyArmorDamage(overkill, resTarget, true, log, 'ARMOR BREAK');
         }
-        if (targetMut.currentHP <= 0 && beforeHP > 0) {
-          oppMutationsDestroyedThisTurn.push(targetMut.mutation);
-          log.push(`MUTATION DESTROYED: ${targetMut.mutation.name}!`);
-        }
-      }
-      // Finisher: bypass mutations, hit Body direct
-      else if (pMove.isFinisher) {
-        newORes.body = Math.max(0, newORes.body - dmg);
-        log.push(`${pMove.name}: ${dmg} Body (FINISHER — bypasses mutations)`);
-      }
-      // Standard resource targeting with mutation armor
-      else if (pMove.target === 'guard') {
-        applyDamageToResource(dmg, 'guard', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-      } else if (pMove.target === 'composure') {
-        applyDamageToResource(dmg, 'composure', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-      } else if (pMove.target === 'body') {
-        applyDamageToResource(dmg, 'body', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-      } else if (pMove.target === 'guard+composure') {
-        const each = Math.ceil(dmg / 2);
-        applyDamageToResource(each, 'guard', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-        applyDamageToResource(each, 'composure', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-      } else if (pMove.target === 'all') {
-        applyDamageToResource(dmg, 'guard', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-        applyDamageToResource(dmg, 'composure', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
-        applyDamageToResource(dmg, 'body', newOppMutHP, pMove, log, 'opponent', oppMutationsDestroyedThisTurn, false);
+        if (targetMut.currentHP <= 0 && beforeHP > 0) { oppMutationsDestroyedThisTurn.push(targetMut.mutation); log.push(`MUTATION DESTROYED: ${targetMut.mutation.name}!`); }
+      } else {
+        // Standard channel routing: POWER→Guard, PSYCHIC→Composure, FINISHER→Body, SELF→nothing
+        routeChannelDamage(dmg, pMove, newORes, newOppMutHP, log, oppMutationsDestroyedThisTurn, true);
       }
 
-      // Utility / regen effects
-      if (pMove.target === 'utility' && pMove.effect === 'costIncrease') {
-        newAiCostMod = 2;
-        log.push(`${pMove.name}: opponent moves +2 cost next turn`);
-      } else if (pMove.target === 'regen' || pMove.effect === 'regenGuard') {
+      // AREA keyword splash: after primary damage, 1 damage to random alive mutation
+      if (pMove.keyword === 'AREA' || pMove.effect === 'areaSplash') {
+        const aliveMuts = Object.entries(newOppMutHP).filter(([, v]) => v.currentHP > 0);
+        if (aliveMuts.length > 0) {
+          const [, splashMut] = aliveMuts[Math.floor(Math.random() * aliveMuts.length)];
+          splashMut.currentHP = Math.max(0, splashMut.currentHP - 1);
+          log.push(`AREA Splash: 1 to ${splashMut.mutation.name}`);
+          if (splashMut.currentHP <= 0) { oppMutationsDestroyedThisTurn.push(splashMut.mutation); log.push(`MUTATION DESTROYED: ${splashMut.mutation.name}!`); }
+        }
+      }
+
+      // Regen effects (SELF channel moves)
+      if (pMove.effect === 'regenGuard') {
         const regenAmt = pMove.regenAmount || 3;
         newPRes.guard = Math.min(MAX_GUARD, newPRes.guard + regenAmt);
         log.push(`${pMove.name}: +${regenAmt} Guard`);
@@ -824,14 +1007,13 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       // Deduct player stamina
       newPRes.stamina -= pPush;
 
-      // Gorilla Momentum tracking
+      // Gorilla Momentum tracking (POWER channel = Guard hits)
       if (playerCharKey === 'cyberGorilla') {
-        if (pMove.target === 'guard' || pMove.target === 'guard+composure' || pMove.target === 'guard+body') {
+        if (pMove.channel === 'POWER') {
           newMomentum++;
           log.push(`Momentum: ${newMomentum}`);
         } else {
-          // Momentum Capacitor tech: doesn't reset on miss (still resets on defensive moves)
-          if (!hasTechEffect('momentumPersist') || pMove.target === 'defense' || pMove.target === 'regen') {
+          if (!hasTechEffect('momentumPersist') || pMove.channel === 'SELF') {
             newMomentum = 0;
           }
         }
@@ -892,6 +1074,21 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
       if (!oWon) log.push('(Half damage — lost matchup)');
 
+      // Flash Grenade: opponent deals 0 damage this turn
+      if (flashBlind) {
+        dmg = 0;
+        log.push('FLASH BLIND: opponent deals 0 damage!');
+        setFlashBlind(false);
+      }
+
+      // Damage Shield: absorb incoming damage
+      if (damageShield > 0 && dmg > 0) {
+        const absorbed = Math.min(damageShield, dmg);
+        dmg -= absorbed;
+        setDamageShield(prev => prev - absorbed);
+        log.push(`Shield absorbed ${absorbed} damage (${damageShield - absorbed} remaining)`);
+      }
+
       // Apply AI damage to player resources with mutation armor
       // Helper for player-side mutation armor
       function applyDmgToPlayer(amount, resource, move, isFinisher) {
@@ -906,7 +1103,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
           let mutDmg = amount;
           if (mut.weakness && move.moveType === mut.weakness) { mutDmg = Math.floor(amount * 1.5); log.push(`WEAK! (+50%)`); }
           if (mut.resistance && move.moveType === mut.resistance) { mutDmg = Math.floor(amount * 0.75); log.push(`Resisted! (-25%)`); }
-          if (move.moveType === 'grab') { mutDmg = Math.floor(mutDmg * 1.5); log.push('Grab +50%'); }
+          if (move.keyword === 'GRAB') { mutDmg = Math.floor(mutDmg * 1.5); log.push('Grab +50%'); }
           const before = mut.currentHP;
           mut.currentHP = Math.max(0, mut.currentHP - mutDmg);
           log.push(`${move.name}: ${Math.min(mutDmg, before)} to ${mut.mutation.name} (${mut.currentHP}/${mut.maxHP})`);
@@ -933,7 +1130,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
         let mutDmg = dmg;
         if (mut.weakness && oMove.moveType === mut.weakness) { mutDmg = Math.floor(dmg * 1.5); log.push('WEAK! (+50%)'); }
         if (mut.resistance && oMove.moveType === mut.resistance) { mutDmg = Math.floor(dmg * 0.75); log.push('Resisted!'); }
-        if (oMove.moveType === 'grab') { mutDmg = Math.floor(mutDmg * 1.5); log.push('Grab +50%'); }
+        if (oMove.keyword === 'GRAB') { mutDmg = Math.floor(mutDmg * 1.5); log.push('Grab +50%'); }
         // Parasitex Assimilate: double damage to mutation, 0 to resources
         if (opponentCharKey === 'parasitex' && oWon) { mutDmg *= 2; log.push('ASSIMILATE: 2x mutation damage!'); }
         const before = mut.currentHP;
@@ -1244,6 +1441,20 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     setMutationHP(newMutHP);
     setOppMutationHP(newOppMutHP);
 
+    // Compute resource changes for display
+    setPResChanges({
+      guard: newPRes.guard - pResRef.current.guard,
+      composure: newPRes.composure - pResRef.current.composure,
+      body: newPRes.body - pResRef.current.body,
+      stamina: newPRes.stamina - pResRef.current.stamina,
+    });
+    setOResChanges({
+      guard: newORes.guard - oResRef.current.guard,
+      composure: newORes.composure - oResRef.current.composure,
+      body: newORes.body - oResRef.current.body,
+      stamina: newORes.stamina - oResRef.current.stamina,
+    });
+
     // Update state
     setPRes(newPRes);
     setORes(newORes);
@@ -1254,50 +1465,54 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     setTurnLog(log);
     setPhase(PHASE.RESOLUTION);
 
-    // Check win conditions after a delay
-    setTimeout(() => {
-      // KO
-      if (newORes.body <= 0) {
-        setOpponentAnimState('ko');
-        const isFinisher = pMove?.isFinisher && (winner === 'a' || winner === 'both');
-        playSound(isFinisher ? 'finisherLand' : 'ko');
-        setFightResult({
-          won: true,
-          reason: isFinisher ? `FINISHED — ${pMove.name}` : 'KO',
-          turns: turn,
-        });
-        setPhase(PHASE.FIGHT_OVER);
-        return;
-      }
-      if (newPRes.body <= 0) {
-        setPlayerAnimState('ko');
-        const isFinisher = oMove?.isFinisher && (winner === 'b' || winner === 'both');
-        playSound(isFinisher ? 'finisherLand' : 'ko');
-        setFightResult({
-          won: false,
-          reason: isFinisher ? `FINISHED — ${oMove.name}` : 'KO',
-          turns: turn,
-        });
-        setPhase(PHASE.FIGHT_OVER);
-        return;
-      }
+    // Check win conditions immediately (KO/Decision auto-trigger, next turn waits for click)
+    if (newORes.body <= 0) {
+      setOpponentAnimState('ko');
+      const isFinisher = pMove?.isFinisher && (winner === 'a' || winner === 'both');
+      playSound(isFinisher ? 'finisherLand' : 'ko');
+      setFightResult({
+        won: true,
+        reason: isFinisher ? `FINISHED — ${pMove.name}` : 'KO',
+        turns: turn,
+      });
+      setTimeout(() => setPhase(PHASE.FIGHT_OVER), 1000);
+      return;
+    }
+    if (newPRes.body <= 0) {
+      setPlayerAnimState('ko');
+      const isFinisher = oMove?.isFinisher && (winner === 'b' || winner === 'both');
+      playSound(isFinisher ? 'finisherLand' : 'ko');
+      setFightResult({
+        won: false,
+        reason: isFinisher ? `FINISHED — ${oMove.name}` : 'KO',
+        turns: turn,
+      });
+      setTimeout(() => setPhase(PHASE.FIGHT_OVER), 1000);
+      return;
+    }
+    if (turn >= MAX_TURNS) {
+      const pTotal = newPRes.guard + newPRes.composure + newPRes.body;
+      const oTotal = newORes.guard + newORes.composure + newORes.body;
+      setFightResult({
+        won: pTotal >= oTotal,
+        reason: `Decision (${pTotal} vs ${oTotal})`,
+        turns: turn,
+      });
+      setTimeout(() => setPhase(PHASE.FIGHT_OVER), 1000);
+      return;
+    }
 
-      // Decision at turn 20
-      if (turn >= MAX_TURNS) {
-        const pTotal = newPRes.guard + newPRes.composure + newPRes.body;
-        const oTotal = newORes.guard + newORes.composure + newORes.body;
-        setFightResult({
-          won: pTotal >= oTotal,
-          reason: `Decision (${pTotal} vs ${oTotal})`,
-          turns: turn,
-        });
-        setPhase(PHASE.FIGHT_OVER);
-        return;
-      }
+    // Normal turn end: wait for player click
+    setWaitingForClick(true);
+  }
 
-      // Next turn
-      endTurn();
-    }, 2000);
+  // Click to proceed from RESOLUTION → next turn
+  function handleResolutionContinue() {
+    setWaitingForClick(false);
+    setPResChanges({});
+    setOResChanges({});
+    setPrevTurnLog([...turnLog]);
+    endTurn();
   }
 
   // Filter moves for tutorial and remove destroyed mutations
@@ -1328,27 +1543,23 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       setAiMove(aiDecision.move);
       setAiStaminaPush(aiDecision.staminaPush);
       setMatchupResult({ winner: 'b', reason: 'You passed — opponent acts unopposed' });
-      setPhase(PHASE.COMMITTED);
-      setTimeout(() => {
-        setPhase(PHASE.PUSH_REVEAL);
-        setTimeout(() => resolveTurn(null, aiDecision.move, 'b', 0, aiDecision.staminaPush), 800);
-      }, 500);
+      setPhase(PHASE.PUSH_REVEAL);
     } else {
       // Both exhausted — just regen
       setPRes(prev => ({ ...prev, stamina: clamp(prev.stamina + (prev.stamina < 3 ? 1 : STAMINA_REGEN), 0, STAMINA_CAP) }));
       setORes(prev => ({ ...prev, stamina: clamp(prev.stamina + (prev.stamina < 3 ? 1 : STAMINA_REGEN), 0, STAMINA_CAP) }));
       setTurnLog(['Both fighters rest. Stamina regenerates.']);
       setPhase(PHASE.RESOLUTION);
-      setTimeout(() => {
-        if (turn >= MAX_TURNS) {
-          const pTotal = pRes.guard + pRes.composure + pRes.body;
-          const oTotal = oRes.guard + oRes.composure + oRes.body;
-          setFightResult({ won: pTotal >= oTotal, reason: `Decision (${pTotal} vs ${oTotal})`, turns: turn });
-          setPhase(PHASE.FIGHT_OVER);
-        } else {
-          endTurn();
-        }
-      }, 2000);
+      if (turn >= MAX_TURNS) {
+        const p = pResRef.current;
+        const o = oResRef.current;
+        const pTotal = p.guard + p.composure + p.body;
+        const oTotal = o.guard + o.composure + o.body;
+        setFightResult({ won: pTotal >= oTotal, reason: `Decision (${pTotal} vs ${oTotal})`, turns: turn });
+        setTimeout(() => setPhase(PHASE.FIGHT_OVER), 1000);
+      } else {
+        setWaitingForClick(true);
+      }
     }
   }
 
@@ -1365,20 +1576,36 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     setTurnLog([]);
     setPlayerAnimState('idle');
     setOpponentAnimState('idle');
-    setGhostMove(null); // ghost move expires after 1 turn
+    setGhostMove(null);
+    setWaitingForClick(false);
+    // Decrement scanner reveal
+    if (revealTurns > 0) setRevealTurns(prev => prev - 1);
     setPhase(PHASE.MOVE_SELECT);
   }
 
-  // Resource bar component
-  function ResourceBar({ label, value, max, color, bgColor }) {
+  // Resource bar component with change indicator
+  function ResourceBar({ label, value, max, color, change }) {
+    const pct = Math.max(0, (value / max) * 100);
+    const hasChange = change !== undefined && change !== 0;
+    const changeColor = change > 0 ? '#44ff66' : '#ff4444';
+    const changeText = change > 0 ? `+${change}` : `${change}`;
     return (
       <div style={{ marginBottom: 6 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, color: 'var(--text-muted)' }}>
-          <span>{label}</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color }}>{value}/{max}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, color: '#8899aa' }}>
+          <span style={{ fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', fontSize: 10 }}>{label}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', color, fontWeight: 700 }}>
+            {value}/{max}
+            {hasChange && (
+              <span style={{ color: changeColor, fontSize: 10, marginLeft: 4, fontWeight: 800 }}>{changeText}</span>
+            )}
+          </span>
         </div>
-        <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(value / max) * 100}%`, background: color, borderRadius: 4, transition: 'width 0.3s ease' }} />
+        <div style={{ height: 10, background: '#1a2030', borderRadius: 4, overflow: 'hidden', border: '1px solid #2a3040' }}>
+          <div style={{
+            height: '100%', width: `${pct}%`, background: color, borderRadius: 3,
+            transition: 'width 0.4s ease',
+            boxShadow: value <= max * 0.25 ? `0 0 8px ${color}88` : 'none',
+          }} />
         </div>
       </div>
     );
@@ -1455,6 +1682,11 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                 {oppIntent === 'finishing' ? 'KILL' : oppIntent === 'defending' ? 'DEF' : oppIntent === 'targeting' ? 'TGT' : oppIntent === 'setup' ? 'SET' : 'ATK'}
               </span>
             )}
+            {revealTurns > 0 && aiMove && phase === PHASE.COMMITTED && (
+              <span style={{ fontSize: 9, padding: '1px 5px', border: '1px solid #44aaff', borderRadius: 0, color: '#44aaff', letterSpacing: 1 }}>
+                📡 {aiMove.name}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1475,13 +1707,13 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       <div style={{ position: 'absolute', top: 56, left: 8, width: 140, padding: 8, ...glassPanel, zIndex: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, color: playerChar.color, textTransform: 'uppercase', letterSpacing: 1 }}>YOU</div>
         {(tutorialPhase !== TUTORIAL_PHASES.BODY_ONLY) && (
-          <ResourceBar label="Guard" value={pRes.guard} max={MAX_GUARD} color="var(--guard)" />
+          <ResourceBar label="Guard" value={pRes.guard} max={MAX_GUARD} color="var(--guard)" change={pResChanges.guard} />
         )}
         {(tutorialPhase === TUTORIAL_PHASES.FULL_SYSTEM) && (
-          <ResourceBar label="Composure" value={pRes.composure} max={MAX_COMPOSURE} color="var(--composure)" />
+          <ResourceBar label="Composure" value={pRes.composure} max={MAX_COMPOSURE} color="var(--composure)" change={pResChanges.composure} />
         )}
-        <ResourceBar label="Body" value={pRes.body} max={MAX_BODY} color="var(--body-hp)" />
-        <ResourceBar label="Stamina" value={pRes.stamina} max={MAX_STAMINA} color="var(--stamina)" />
+        <ResourceBar label="Body" value={pRes.body} max={MAX_BODY} color="var(--body-hp)" change={pResChanges.body} />
+        <ResourceBar label="Stamina" value={pRes.stamina} max={MAX_STAMINA} color="var(--stamina)" change={pResChanges.stamina} />
         {pBroken.guard && tutorialPhase !== TUTORIAL_PHASES.BODY_ONLY && <BrokenTag label="Guard Broken" />}
         {pBroken.composure && tutorialPhase === TUTORIAL_PHASES.FULL_SYSTEM && <BrokenTag label="Composure Broken" />}
         {pBroken.stamina && <BrokenTag label="Exhausted" />}
@@ -1522,13 +1754,13 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       <div style={{ position: 'absolute', top: 56, right: 8, width: 140, padding: 8, ...glassPanel, zIndex: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, color: oppChar.color, textTransform: 'uppercase', letterSpacing: 1 }}>OPPONENT</div>
         {(tutorialPhase !== TUTORIAL_PHASES.BODY_ONLY) && (
-          <ResourceBar label="Guard" value={oRes.guard} max={MAX_GUARD} color="var(--guard)" />
+          <ResourceBar label="Guard" value={oRes.guard} max={MAX_GUARD} color="var(--guard)" change={oResChanges.guard} />
         )}
         {(tutorialPhase === TUTORIAL_PHASES.FULL_SYSTEM) && (
-          <ResourceBar label="Composure" value={oRes.composure} max={MAX_COMPOSURE} color="var(--composure)" />
+          <ResourceBar label="Composure" value={oRes.composure} max={MAX_COMPOSURE} color="var(--composure)" change={oResChanges.composure} />
         )}
-        <ResourceBar label="Body" value={oRes.body} max={MAX_BODY} color="var(--body-hp)" />
-        <ResourceBar label="Stamina" value={oRes.stamina} max={MAX_STAMINA} color="var(--stamina)" />
+        <ResourceBar label="Body" value={oRes.body} max={MAX_BODY} color="var(--body-hp)" change={oResChanges.body} />
+        <ResourceBar label="Stamina" value={oRes.stamina} max={MAX_STAMINA} color="var(--stamina)" change={oResChanges.stamina} />
         {oBroken.guard && tutorialPhase !== TUTORIAL_PHASES.BODY_ONLY && <BrokenTag label="Guard Broken" />}
         {oBroken.composure && tutorialPhase === TUTORIAL_PHASES.FULL_SYSTEM && <BrokenTag label="Composure Broken" />}
         {oBroken.stamina && <BrokenTag label="Exhausted" />}
@@ -1623,18 +1855,21 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
           </div>
         )}
 
-        {/* Committed — hidden cards */}
+        {/* Committed — hidden cards + click to reveal */}
         {phase === PHASE.COMMITTED && (
-          <div style={{ ...glassPanel, padding: 16 }}>
+          <div style={{ ...glassPanel, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <div style={{ display: 'flex', gap: 40, alignItems: 'center' }}>
               <MoveCard label="YOUR MOVE" name="???" color="var(--text-muted)" />
               <MoveCard label="OPPONENT" name="???" color="var(--text-muted)" />
             </div>
             {selectedTarget && selectedTarget !== 'body' && oppMutationHP[selectedTarget] && (
-              <div style={{ textAlign: 'center', marginTop: 8, fontSize: 11, fontWeight: 600, color: 'var(--composure)' }}>
+              <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--composure)' }}>
                 Targeting: {oppMutationHP[selectedTarget]?.mutation?.name}
               </div>
             )}
+            <button onClick={handleRevealClick} className="btn" style={{ marginTop: 4, padding: '8px 24px', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+              Reveal Moves
+            </button>
           </div>
         )}
 
@@ -1662,26 +1897,43 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
               {matchupResult?.reason}
             </div>
 
-            {/* Stamina push values */}
+            {/* Click to continue from REVEAL → Stamina Push */}
+            {phase === PHASE.REVEAL && waitingForClick && (
+              <button onClick={handleRevealContinue} className="btn" style={{ marginTop: 8, padding: '8px 24px', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Continue
+              </button>
+            )}
+
+            {/* Stamina push values + click to resolve */}
             {phase === PHASE.PUSH_REVEAL && (
-              <div style={{ display: 'flex', gap: 40, marginTop: 4 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Your Push</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--stamina)', fontFamily: 'var(--font-mono)' }}>{staminaPush}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <div style={{ display: 'flex', gap: 40 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#8899aa' }}>Your Push</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--stamina)', fontFamily: 'var(--font-mono)' }}>{staminaPush}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#8899aa' }}>Their Push</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--stamina)', fontFamily: 'var(--font-mono)' }}>{aiStaminaPush}</div>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Their Push</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--stamina)', fontFamily: 'var(--font-mono)' }}>{aiStaminaPush}</div>
-                </div>
+                <button onClick={handlePushRevealContinue} className="btn" style={{ padding: '8px 24px', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Resolve
+                </button>
               </div>
             )}
 
-            {/* Resolution log */}
+            {/* Resolution log + click to continue */}
             {phase === PHASE.RESOLUTION && turnLog.length > 0 && (
-              <div style={{ padding: 8, maxWidth: 300, width: '100%' }}>
+              <div style={{ padding: 8, maxWidth: 340, width: '100%' }}>
                 {turnLog.map((line, i) => (
-                  <div key={i} style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{line}</div>
+                  <div key={i} style={{ fontSize: 12, color: '#aabbcc', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{line}</div>
                 ))}
+                {waitingForClick && (
+                  <button onClick={handleResolutionContinue} className="btn" style={{ marginTop: 8, width: '100%', padding: '8px 24px', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Next Turn
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1704,7 +1956,6 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                           setStaminaPush(pushVal);
                           playSound('pushCommit');
                           setPhase(PHASE.PUSH_REVEAL);
-                          setTimeout(() => resolveTurn(selectedMove, aiMove, matchupResult.winner, pushVal, aiStaminaPush), 800);
                         }}
                         style={{ padding: '10px 20px', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', background: 'transparent', border: '1px solid var(--stamina)', borderRadius: 4, color: 'var(--stamina)' }}
                       >
@@ -1773,9 +2024,17 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
         )}
       </div>
 
-      {/* ═══ BOTTOM OVERLAY — move list + actions ═══ */}
+      {/* ═══ BOTTOM OVERLAY — prev turn log + move list + actions ═══ */}
       {phase === PHASE.MOVE_SELECT && (
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, ...glassPanel, borderRadius: 0, borderBottom: 'none', borderLeft: 'none', borderRight: 'none', padding: '10px 16px', zIndex: 10 }}>
+          {/* Previous turn log — collapsed summary */}
+          {prevTurnLog.length > 0 && (
+            <div style={{ marginBottom: 6, padding: '4px 8px', background: '#0a1220', borderRadius: 3, maxHeight: 48, overflowY: 'auto' }}>
+              {prevTurnLog.slice(-3).map((line, i) => (
+                <div key={i} style={{ fontSize: 10, color: '#667788', fontFamily: 'var(--font-mono)', marginBottom: 1 }}>{line}</div>
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap', justifyContent: 'center' }}>
             {visibleMoves.map((move, idx) => {
               const effCost = getEffectiveCost(move, pBroken, costModifier);
@@ -1857,19 +2116,25 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
           {/* Items dropdown */}
           {showItems && items && items.length > 0 && (
             <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {items.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => { setSelectedItem(item); setShowItems(false); handleItemCommit(); }}
-                  style={{
-                    padding: '6px 14px', fontSize: 11, fontWeight: 600,
-                    background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)',
-                    borderRadius: 4, color: 'var(--stamina)',
-                  }}
-                >
-                  {item.name}
-                </button>
-              ))}
+              {items.map((item, idx) => {
+                const catColors = { restore: '#44cc66', buff: '#eab308', disrupt: '#cc4444', tactical: '#44aaff' };
+                const borderCol = catColors[item.category] || 'rgba(234,179,8,0.3)';
+                return (
+                  <button
+                    key={`${item.id}_${idx}`}
+                    onClick={() => handleItemUse(item)}
+                    title={item.description}
+                    style={{
+                      padding: '6px 14px', fontSize: 11, fontWeight: 600,
+                      background: `${borderCol}15`, border: `1px solid ${borderCol}50`,
+                      borderRadius: 4, color: borderCol, display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: 13 }}>{item.icon || '•'}</span>
+                    {item.name}
+                  </button>
+                );
+              })}
             </div>
           )}
 

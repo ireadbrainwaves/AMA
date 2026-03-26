@@ -197,7 +197,7 @@ export const TECH_ENHANCEMENTS = {
     description: 'Gorilla Punch → Rocket Punch (split pierce Guard + Body).',
     effect: 'rocketFist',
     transformsMove: 'gorilla_punch',
-    newMove: { id: 'rocket_punch', name: 'Rocket Punch', minCost: 2, baseDamage: 2, target: 'guard+body', moveType: 'power', beats: ['evasion'], losesTo: ['fast'], flavor: 'Splits damage between Guard and Body.', isFinisher: false, finisherCondition: null, effect: 'splitPierce' },
+    newMove: { id: 'rocket_punch', name: 'Rocket Punch', minCost: 2, baseDamage: 2, channel: 'POWER', keyword: null, moveType: 'power', flavor: 'Splits damage between Guard and Body.', isFinisher: false, finisherCondition: null, effect: 'splitPierce' },
   },
   synapse_swap: {
     id: 'synapse_swap',
@@ -209,7 +209,7 @@ export const TECH_ENHANCEMENTS = {
     description: 'Mind Spike → Synapse Spike (swaps 2 opponent moves on hit).',
     effect: 'synapseSwap',
     transformsMove: 'mind_spike',
-    newMove: { id: 'synapse_spike', name: 'Synapse Spike', minCost: 2, baseDamage: 2, target: 'composure', moveType: 'psychic', beats: ['defense'], losesTo: ['fast'], flavor: 'Scrambles neural pathways. Swaps 2 opponent moves.', isFinisher: false, finisherCondition: null, effect: 'synapseSwap' },
+    newMove: { id: 'synapse_spike', name: 'Synapse Spike', minCost: 2, baseDamage: 2, channel: 'PSYCHIC', keyword: null, moveType: 'psychic', flavor: 'Scrambles neural pathways. Swaps 2 opponent moves.', isFinisher: false, finisherCondition: null, effect: 'synapseSwap' },
   },
   hive_thrusters: {
     id: 'hive_thrusters',
@@ -221,7 +221,7 @@ export const TECH_ENHANCEMENTS = {
     description: 'Sting Barrage → Thruster Barrage (hits twice at half damage each).',
     effect: 'hiveThrusters',
     transformsMove: 'sting_barrage',
-    newMove: { id: 'thruster_barrage', name: 'Thruster Barrage', minCost: 1, baseDamage: 1, target: 'body', moveType: 'fast', beats: ['power', 'finisher'], losesTo: ['area'], flavor: 'Twin thruster strikes. Hits twice, half each.', isFinisher: false, finisherCondition: null, effect: 'doubleHit' },
+    newMove: { id: 'thruster_barrage', name: 'Thruster Barrage', minCost: 1, baseDamage: 2, channel: 'POWER', keyword: 'FAST', moveType: 'fast', flavor: 'Twin thruster strikes. Hits twice, half each.', isFinisher: false, finisherCondition: null, effect: 'doubleHit' },
   },
   spike_plating: {
     id: 'spike_plating',
@@ -233,7 +233,7 @@ export const TECH_ENHANCEMENTS = {
     description: 'Shell Block → Spike Shell (reflects stamina push as Body damage).',
     effect: 'spikePlating',
     transformsMove: 'shell_block',
-    newMove: { id: 'spike_shell', name: 'Spike Shell', minCost: 1, baseDamage: 0, target: 'defense', moveType: 'defense', beats: ['fast'], losesTo: ['grab', 'psychic'], flavor: 'Spiked shell. Reflects attacker stamina as Body damage.', isFinisher: false, finisherCondition: null, effect: 'spikeReflect' },
+    newMove: { id: 'spike_shell', name: 'Spike Shell', minCost: 1, baseDamage: 0, channel: 'SELF', keyword: 'DEFENSE', moveType: 'defense', flavor: 'Spiked shell. Reflects attacker stamina as Body damage.', isFinisher: false, finisherCondition: null, effect: 'spikeReflect' },
   },
 };
 

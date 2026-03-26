@@ -2,12 +2,20 @@ import { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { CharacterCompositor, animateLunge } from '../rendering/CharacterCompositor';
 import SPRITES from '../data/spriteMap';
+import { TECH_ENHANCEMENTS } from '../data/constants';
 
 /**
  * Get the sprite path for a mutation overlay.
  */
 function getMutationSpritePath(mutationId, view) {
   return `/assets/mutations/MUT_${mutationId}_${view}.png`;
+}
+
+/**
+ * Get the tech category for a tech ID (for glow color).
+ */
+function getTechCategory(techId) {
+  return TECH_ENHANCEMENTS[techId]?.category || 'offensive';
 }
 
 /* ───────────────────────────────────────────────
@@ -463,7 +471,9 @@ export default function BattleArena({
         const mutPromises = Object.entries(playerBuild.slots).map(async ([slot, data]) => {
           if (data.mutation) {
             await player.attachMutation(slot, getMutationSpritePath(data.mutation, 'front'));
-            if (data.tech?.length > 0) player.addTechGlow(slot);
+            if (data.tech?.length > 0) {
+              data.tech.forEach(tId => player.addTechGlow(slot, getTechCategory(tId), tId));
+            }
           }
         });
         await Promise.all(mutPromises);
@@ -545,7 +555,9 @@ export default function BattleArena({
       Object.entries(playerBuild.slots).forEach(([slot, data]) => {
         if (data.mutation) {
           player.attachMutation(slot, getMutationSpritePath(data.mutation, 'front'));
-          if (data.tech?.length > 0) player.addTechGlow(slot);
+          if (data.tech?.length > 0) {
+              data.tech.forEach(tId => player.addTechGlow(slot, getTechCategory(tId), tId));
+            }
         }
       });
     }

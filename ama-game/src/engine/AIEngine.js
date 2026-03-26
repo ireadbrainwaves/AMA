@@ -54,20 +54,22 @@ export function getAIDecision(aiCharKey, aiMoves, aiResources, opponentResources
     }
   }
 
-  // 3. Exploit broken resource: 60% exploit
+  // 3. Exploit broken resource: 60% exploit (channel-aware: POWER→Guard broken = Body dmg, PSYCHIC→Comp broken = Body dmg)
   if (difficulty !== 'easy' && Math.random() < 0.6) {
     if (opponentResources.guard <= 0) {
-      const bodyMoves = affordable.filter(m => m.target === 'body' && m.baseDamage > 0);
-      if (bodyMoves.length > 0) {
-        const move = bodyMoves[Math.floor(Math.random() * bodyMoves.length)];
+      // Guard broken: POWER moves now hit Body directly — prefer them
+      const powerMoves = affordable.filter(m => (m.channel === 'POWER' || m.target === 'guard') && m.baseDamage > 0);
+      if (powerMoves.length > 0) {
+        const move = powerMoves[Math.floor(Math.random() * powerMoves.length)];
         const push = getStaminaPush(aiCharKey, move, aiResources.stamina, difficulty);
         return withIntent({ move, staminaPush: push }, 'attacking');
       }
     }
     if (opponentResources.composure <= 0) {
-      const compMoves = affordable.filter(m => m.target === 'composure' && m.baseDamage > 0);
-      if (compMoves.length > 0) {
-        const move = compMoves[Math.floor(Math.random() * compMoves.length)];
+      // Composure broken: PSYCHIC moves now hit Body directly
+      const psychicMoves = affordable.filter(m => (m.channel === 'PSYCHIC' || m.target === 'composure') && m.baseDamage > 0);
+      if (psychicMoves.length > 0) {
+        const move = psychicMoves[Math.floor(Math.random() * psychicMoves.length)];
         const push = getStaminaPush(aiCharKey, move, aiResources.stamina, difficulty);
         return withIntent({ move, staminaPush: push }, 'attacking');
       }
@@ -259,7 +261,7 @@ function hydravineAI(moves, aiRes, oppRes, state, difficulty) {
   }
 
   // Default: alternate vine_lash and thorn_barrage
-  const alternating = moves.filter(m => m.id === 'vine_lash' || m.id === 'thorn_barrage');
+  const alternating = moves.filter(m => m.id === 'vine_lash' || m.id === 'thorn_burst');
   if (alternating.length > 0) {
     const move = alternating[Math.floor(Math.random() * alternating.length)];
     return withIntent({ move, staminaPush: getStaminaPush('hydravine', move, aiRes.stamina, difficulty) }, inferIntent(move));
@@ -303,7 +305,7 @@ function gorillaWeights(moves, oppRes) {
   return moves.map(m => {
     if (m.target === 'guard') return 50;
     if (m.id === 'iron_grip' && oppRes.stamina > 6) return 20;
-    if (m.id === 'chest_slam' && oppRes.guard <= 0) return 20;
+    if (m.id === 'chest_beat' && oppRes.guard <= 0) return 20;
     if (m.id === 'ground_pound') return 10;
     return 5;
   });
@@ -338,7 +340,7 @@ function turtleWeights(moves, aiRes, oppRes) {
     if (m.id === 'fortress_mode' && aiRes.guard < 7) return 30;
     if (m.id === 'fortress_mode') return 25;
     if (m.id === 'snap_bite') return 20;
-    if (m.id === 'anchor_slam') return 15;
+    if (m.id === 'tremor_stomp') return 15;
     return 5;
   });
 }
@@ -429,6 +431,7 @@ function checkFinisherCondition(move, oppRes, fightState) {
   switch (move.finisherCondition) {
     case 'opponentGuardBroken': return oppRes.guard <= 0;
     case 'opponentComposureBroken': return oppRes.composure <= 0;
+    case 'opponentArmorBroken': return oppRes.guard <= 0 || oppRes.composure <= 0;
     case 'opponentStaminaLow': return oppRes.stamina < 3;
     case 'hasStolenMutation': return (fightState?.parasitexStolenCount || 0) > 0;
     default: return false;

@@ -89,21 +89,91 @@ export class CharacterCompositor {
     this.layers[slot].mutationSprite = null;
   }
 
-  /** Add tech glow effect to a slot (additive blend) */
-  addTechGlow(slot, glowColor = 0x00ccff) {
+  /**
+   * Add tech enhancement visual to a slot.
+   * @param {string} slot       - compositor slot name (head, chest, leftArm, etc.)
+   * @param {string} category   - tech category: 'offensive','defensive','utility','passive','starter'
+   * @param {string} [techId]   - specific tech ID for unique visuals
+   */
+  addTechGlow(slot, category = 'offensive', techId = null) {
     const mutSprite = this.layers[slot]?.mutationSprite;
     if (!mutSprite) return;
 
-    const glow = new PIXI.Sprite(mutSprite.texture);
-    glow.anchor.set(0.5);
-    glow.x = mutSprite.x;
-    glow.y = mutSprite.y;
-    glow.scale.set(1.15);
-    glow.tint = glowColor;
-    glow.alpha = 0.4;
-    glow.blendMode = 'add';
+    // Category-specific glow colors and styles
+    const TECH_STYLES = {
+      offensive: { color: 0xff4444, alpha: 0.45, scale: 1.18, pulseSpeed: 0.06 },
+      defensive: { color: 0x44aaff, alpha: 0.35, scale: 1.22, pulseSpeed: 0.03 },
+      utility:   { color: 0x44ff88, alpha: 0.35, scale: 1.15, pulseSpeed: 0.05 },
+      passive:   { color: 0xffaa00, alpha: 0.30, scale: 1.12, pulseSpeed: 0.02 },
+      starter:   { color: 0xff44ff, alpha: 0.40, scale: 1.20, pulseSpeed: 0.04 },
+    };
+    const style = TECH_STYLES[category] || TECH_STYLES.offensive;
 
-    this.layers.techGlow.addChild(glow);
+    // Outer glow ring (additive, larger)
+    const outerGlow = new PIXI.Sprite(mutSprite.texture);
+    outerGlow.anchor.set(0.5);
+    outerGlow.x = mutSprite.x;
+    outerGlow.y = mutSprite.y;
+    outerGlow.scale.set(style.scale + 0.08);
+    outerGlow.tint = style.color;
+    outerGlow.alpha = style.alpha * 0.4;
+    outerGlow.blendMode = 'add';
+    this.layers.techGlow.addChild(outerGlow);
+
+    // Inner glow (additive, tighter)
+    const innerGlow = new PIXI.Sprite(mutSprite.texture);
+    innerGlow.anchor.set(0.5);
+    innerGlow.x = mutSprite.x;
+    innerGlow.y = mutSprite.y;
+    innerGlow.scale.set(style.scale);
+    innerGlow.tint = style.color;
+    innerGlow.alpha = style.alpha;
+    innerGlow.blendMode = 'add';
+    this.layers.techGlow.addChild(innerGlow);
+
+    // Tech icon overlay sprite (if available)
+    const techSpritePath = techId
+      ? `/assets/tech/TECH_${techId}_icon.png`
+      : `/assets/tech/TECH_${category}_icon.png`;
+
+    PIXI.Assets.load(techSpritePath).then(texture => {
+      if (texture?.source) texture.source.scaleMode = 'nearest';
+      const icon = new PIXI.Sprite(texture);
+      icon.anchor.set(0.5);
+      icon.x = mutSprite.x;
+      icon.y = mutSprite.y - 14; // Float above the mutation
+      icon.scale.set(0.6);
+      icon.alpha = 0.85;
+      this.layers.techGlow.addChild(icon);
+      // Store reference for animation
+      icon._techIcon = true;
+    }).catch(() => {
+      // No custom icon — that's fine, glow alone works
+    });
+
+    // Animated pulse — store animation data for tick updates
+    innerGlow._techPulse = { speed: style.pulseSpeed, baseAlpha: style.alpha, phase: Math.random() * Math.PI * 2 };
+    outerGlow._techPulse = { speed: style.pulseSpeed * 0.7, baseAlpha: style.alpha * 0.4, phase: Math.random() * Math.PI * 2 };
+
+    // Register pulse animation if not already running
+    if (!this._techAnimFrame) {
+      this._techAnimFrame = true;
+      const pulse = () => {
+        if (!this.container?.parent) return; // destroyed
+        const t = Date.now() * 0.001;
+        this.layers.techGlow.children.forEach(child => {
+          if (child._techPulse) {
+            const p = child._techPulse;
+            child.alpha = p.baseAlpha + Math.sin(t * p.speed * 60 + p.phase) * p.baseAlpha * 0.3;
+          }
+          if (child._techIcon) {
+            child.y += Math.sin(t * 2) * 0.03; // gentle bob
+          }
+        });
+        requestAnimationFrame(pulse);
+      };
+      requestAnimationFrame(pulse);
+    }
   }
 
   /** Set position of the entire composite */

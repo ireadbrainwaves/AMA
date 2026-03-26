@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { doctorMutations } from '../data/mutations';
-import { items as allItems } from '../data/items';
+import { items as allItems, ITEM_CATEGORIES, RARITY_COLORS, getShopOfferings } from '../data/items';
 import { TECH_ENHANCEMENTS, getAvailableTech } from '../data/constants';
 import CharacterPreview from '../components/CharacterPreview';
 
@@ -69,11 +69,8 @@ export default function DoctorScreen({
     return shuffled.slice(0, 3);
   }, []);
 
-  // Pick 2 random items for sale
-  const itemOfferings = useMemo(() => {
-    const shuffled = [...allItems].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 2);
-  }, []);
+  // Pick 3 items for sale (2 common + 1 better)
+  const itemOfferings = useMemo(() => getShopOfferings(), []);
 
   // Tech installed per slot
   const techBySlot = useMemo(() => {
@@ -491,28 +488,41 @@ function ItemsTab({ itemOfferings, biomass, items, onBuyItem }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="section-header accent-amber">Supplies</div>
       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
-        Items: {items?.length || 0}/3 | Each item costs 1 biomass
+        Items: {items?.length || 0}/3 | Using an item costs your turn (opponent attacks free)
       </div>
       {itemOfferings.map(item => {
-        const canAfford = biomass >= 1;
+        const cost = item.cost || 1;
+        const canAfford = biomass >= cost;
         const atMax = (items?.length || 0) >= 3;
         const disabled = !canAfford || atMax;
+        const catColor = ITEM_CATEGORIES[item.category]?.color || 'var(--text-muted)';
+        const rarityColor = RARITY_COLORS[item.rarity] || '#6a8a9a';
         return (
           <button
             key={item.id}
             disabled={disabled}
-            onClick={() => onBuyItem({ ...item }, 1)}
+            onClick={() => onBuyItem({ ...item }, cost)}
             className="card"
             style={{
               textAlign: 'left', opacity: disabled ? 0.35 : 1,
               cursor: disabled ? 'not-allowed' : 'pointer',
+              borderLeft: `2px solid ${catColor}`,
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-bright)' }}>{item.name}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)' }}>1 bio</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>{item.icon || '•'}</span>
+                {item.name}
+                <span style={{ fontSize: 8, color: rarityColor, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400 }}>
+                  {item.rarity}
+                </span>
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)' }}>{cost} bio</span>
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{item.description}</div>
+            {item.flavor && (
+              <div style={{ fontSize: 9, color: 'var(--text-ghost)', fontStyle: 'italic', marginTop: 2 }}>{item.flavor}</div>
+            )}
           </button>
         );
       })}
@@ -526,15 +536,22 @@ function ItemsTab({ itemOfferings, biomass, items, onBuyItem }) {
       {items && items.length > 0 && (
         <>
           <div className="section-header" style={{ marginTop: 12 }}>Current Inventory</div>
-          {items.map((item, idx) => (
-            <div key={`${item.id}_${idx}`} style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              padding: '6px 10px',
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--text-primary)' }}>{item.name}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{item.description}</div>
-            </div>
-          ))}
+          {items.map((item, idx) => {
+            const catColor = ITEM_CATEGORIES[item.category]?.color || 'var(--text-muted)';
+            return (
+              <div key={`${item.id}_${idx}`} style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderLeft: `2px solid ${catColor}`,
+                padding: '6px 10px',
+              }}>
+                <div style={{ fontSize: 11, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 13 }}>{item.icon || '•'}</span>
+                  {item.name}
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{item.description}</div>
+              </div>
+            );
+          })}
         </>
       )}
     </div>

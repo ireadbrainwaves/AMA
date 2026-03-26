@@ -1,72 +1,58 @@
-// Full 8x8 matchup chart from combat engine spec
-// Row = YOUR move type, Column = OPPONENT's move type
-// 'win' = your move lands, theirs canceled
-// 'lose' = your move canceled
-// 'neutral' = both land
-const MATCHUP_CHART = {
-  power:    { power: 'neutral', fast: 'lose',    grab: 'neutral', psychic: 'neutral', area: 'neutral', defense: 'neutral', evasion: 'win',     finisher: 'neutral' },
-  fast:     { power: 'win',     fast: 'neutral',  grab: 'lose',   psychic: 'win',     area: 'lose',    defense: 'lose',    evasion: 'neutral', finisher: 'win' },
-  grab:     { power: 'neutral', fast: 'win',      grab: 'neutral', psychic: 'neutral', area: 'neutral', defense: 'win',     evasion: 'lose',   finisher: 'neutral' },
-  psychic:  { power: 'neutral', fast: 'lose',     grab: 'neutral', psychic: 'neutral', area: 'neutral', defense: 'win',     evasion: 'neutral', finisher: 'neutral' },
-  area:     { power: 'neutral', fast: 'win',      grab: 'neutral', psychic: 'neutral', area: 'neutral', defense: 'lose',    evasion: 'win',    finisher: 'neutral' },
-  defense:  { power: 'neutral', fast: 'win',      grab: 'lose',   psychic: 'lose',    area: 'win',     defense: 'neutral', evasion: 'neutral', finisher: 'neutral' },
-  evasion:  { power: 'lose',    fast: 'neutral',  grab: 'win',    psychic: 'neutral', area: 'lose',    defense: 'neutral', evasion: 'neutral', finisher: 'win' },
-  finisher: { power: 'neutral', fast: 'lose',     grab: 'neutral', psychic: 'neutral', area: 'neutral', defense: 'neutral', evasion: 'lose',   finisher: 'neutral' },
+// Keyword-only matchup chart (Channel determines WHERE damage goes, Keyword determines IF it lands)
+// Row = YOUR keyword, Column = OPPONENT's keyword
+// null keyword = raw attack (no keyword modifier)
+const KEYWORD_CHART = {
+  GRAB:    { GRAB: 'neutral', FAST: 'lose',    AREA: 'neutral', DEFENSE: 'win',  EVASION: 'lose',    null: 'neutral' },
+  FAST:    { GRAB: 'win',     FAST: 'neutral',  AREA: 'lose',   DEFENSE: 'lose', EVASION: 'neutral', null: 'win' },
+  AREA:    { GRAB: 'neutral', FAST: 'win',      AREA: 'neutral', DEFENSE: 'lose', EVASION: 'win',    null: 'neutral' },
+  DEFENSE: { GRAB: 'lose',    FAST: 'win',      AREA: 'win',    DEFENSE: 'neutral', EVASION: 'neutral', null: 'neutral' },
+  EVASION: { GRAB: 'win',     FAST: 'neutral',  AREA: 'lose',   DEFENSE: 'neutral', EVASION: 'neutral', null: 'neutral' },
+  null:    { GRAB: 'neutral', FAST: 'lose',     AREA: 'neutral', DEFENSE: 'neutral', EVASION: 'neutral', null: 'neutral' },
 };
 
-// Explanation text for why a type wins
-const TYPE_REASONS = {
-  'power>evasion':    'too big to dodge',
-  'fast>power':       'landed before the swing',
-  'fast>psychic':     'struck before the thought formed',
-  'fast>finisher':    'interrupted the windup',
-  'grab>fast':        'caught mid-strike',
-  'grab>defense':     'pulled them out of their shell',
-  'psychic>defense':  "can't block a thought",
-  'area>fast':        'too wide to outrun',
-  'area>evasion':     'nowhere to hide',
-  'defense>fast':     'absorbed the quick hits',
-  'defense>area':     'braced against the blast',
-  'evasion>grab':     'slipped free',
-  'evasion>finisher': 'dodged the slow blast',
+const KEYWORD_REASONS = {
+  'GRAB>DEFENSE':  'pulled them out of their shell',
+  'FAST>GRAB':     'too quick to grab',
+  'FAST>null':     'faster than raw power',
+  'AREA>FAST':     'too wide to outrun',
+  'AREA>EVASION':  'nowhere to hide',
+  'DEFENSE>FAST':  'absorbed the quick hits',
+  'DEFENSE>AREA':  'braced against the blast',
+  'EVASION>GRAB':  'slipped free',
 };
 
 export function resolveMatchup(moveA, moveB) {
-  const tA = moveA.moveType;
-  const tB = moveB.moveType;
+  const kwA = moveA.keyword || null;
+  const kwB = moveB.keyword || null;
 
-  // Check the full chart first
-  const chartResult = MATCHUP_CHART[tA]?.[tB];
+  // FINISHER channel: always neutral matchup (lands if precondition met, fizzles if not)
+  // SELF channel: defensive — resolved via keyword
+  const chartRow = KEYWORD_CHART[kwA] || KEYWORD_CHART[null];
+  const result = chartRow?.[kwB] || 'neutral';
 
-  // Also check per-move beats/losesTo arrays for special overrides
-  const aBeatsB = chartResult === 'win' || moveA.beats?.includes(tB);
-  const bBeatsA = chartResult === 'lose' || moveB.beats?.includes(tA);
-
-  if (aBeatsB && !bBeatsA) {
-    const reason = TYPE_REASONS[`${tA}>${tB}`] || `${tA} beats ${tB}`;
+  if (result === 'win') {
+    const reason = KEYWORD_REASONS[`${kwA}>${kwB}`] || `${kwA || 'raw'} beats ${kwB || 'raw'}`;
     return {
       winner: 'a',
-      reason: `${moveA.name} (${tA}) beats ${moveB.name} (${tB}) — ${reason}!`,
+      reason: `${moveA.name} (${kwA || 'raw'}) beats ${moveB.name} (${kwB || 'raw'}) — ${reason}!`,
       typeReason: reason,
     };
   }
-  if (bBeatsA && !aBeatsB) {
-    const reason = TYPE_REASONS[`${tB}>${tA}`] || `${tB} beats ${tA}`;
+  if (result === 'lose') {
+    const reason = KEYWORD_REASONS[`${kwB}>${kwA}`] || `${kwB || 'raw'} beats ${kwA || 'raw'}`;
     return {
       winner: 'b',
-      reason: `${moveB.name} (${tB}) beats ${moveA.name} (${tA}) — ${reason}!`,
+      reason: `${moveB.name} (${kwB || 'raw'}) beats ${moveA.name} (${kwA || 'raw'}) — ${reason}!`,
       typeReason: reason,
     };
   }
-  // Both beat each other or neither does — neutral
   return {
     winner: 'both',
-    reason: 'Both land — no type advantage!',
+    reason: 'Both land — no keyword advantage!',
     typeReason: null,
   };
 }
 
-// Get matchup result for a specific move vs all opponent moves
 export function getMatchupPreview(myMove, opponentMoves) {
   return opponentMoves.map(oppMove => {
     const result = resolveMatchup(myMove, oppMove);
@@ -78,21 +64,16 @@ export function getMatchupPreview(myMove, opponentMoves) {
   });
 }
 
-// Full type chart for the guide overlay
+// For the matchup guide overlay
 export const TYPE_MATCHUPS = [
-  { attacker: 'power', beats: 'evasion', reason: 'Too big to dodge' },
-  { attacker: 'fast', beats: 'power', reason: 'Lands before the swing' },
-  { attacker: 'fast', beats: 'psychic', reason: 'Struck before the thought' },
-  { attacker: 'fast', beats: 'finisher', reason: 'Interrupts the windup' },
-  { attacker: 'grab', beats: 'fast', reason: 'Caught mid-strike' },
-  { attacker: 'grab', beats: 'defense', reason: 'Pulls them out' },
-  { attacker: 'psychic', beats: 'defense', reason: "Can't block a thought" },
-  { attacker: 'area', beats: 'fast', reason: 'Too wide to outrun' },
-  { attacker: 'area', beats: 'evasion', reason: 'Nowhere to hide' },
-  { attacker: 'defense', beats: 'fast', reason: 'Absorbs the quick hits' },
-  { attacker: 'defense', beats: 'area', reason: 'Braced against the blast' },
-  { attacker: 'evasion', beats: 'grab', reason: 'Slipped free' },
-  { attacker: 'evasion', beats: 'finisher', reason: 'Dodge the slow blast' },
+  { attacker: 'FAST', beats: 'GRAB', reason: 'Too quick to grab' },
+  { attacker: 'FAST', beats: '(raw)', reason: 'Faster than raw power' },
+  { attacker: 'GRAB', beats: 'DEFENSE', reason: 'Pulls them out' },
+  { attacker: 'AREA', beats: 'FAST', reason: 'Too wide to outrun' },
+  { attacker: 'AREA', beats: 'EVASION', reason: 'Nowhere to hide' },
+  { attacker: 'DEFENSE', beats: 'FAST', reason: 'Absorbs the quick hits' },
+  { attacker: 'DEFENSE', beats: 'AREA', reason: 'Braced against the blast' },
+  { attacker: 'EVASION', beats: 'GRAB', reason: 'Slipped free' },
 ];
 
-export { MATCHUP_CHART };
+export { KEYWORD_CHART };

@@ -379,8 +379,9 @@ export default function HubWorld2D({ runState, meta, arenaStates, onInteract, ov
     let floorPattern = null;
     if (ready && arts.floor) floorPattern = ctx.createPattern(arts.floor, 'repeat');
 
+    let running = true;
     function frame() {
-      animRef.current = requestAnimationFrame(frame);
+      if (!running) return;
       const time = Date.now();
 
       // Movement
@@ -1214,10 +1215,11 @@ export default function HubWorld2D({ runState, meta, arenaStates, onInteract, ov
         }
       });
       setNearTarget(closest);
+      animRef.current = requestAnimationFrame(frame);
     }
 
     frame();
-    return () => cancelAnimationFrame(animRef.current);
+    return () => { running = false; cancelAnimationFrame(animRef.current); };
   }, [ready, arts, overlayActive, arenaStates, arenasCleared, blocked]);
 
   const runNum = meta?.totalRuns || 1;

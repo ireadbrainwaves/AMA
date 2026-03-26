@@ -5,12 +5,13 @@ import HubWorld2D from './screens/HubWorld2D';
 import HarvestScreen from './screens/HarvestScreen';
 import DoctorScreen from './screens/DoctorScreen';
 import VictoryScreen from './screens/VictoryScreen';
+import DefeatScreen from './screens/DefeatScreen';
 import ScoutingScreen from './screens/ScoutingScreen';
 import IntroSequence from './screens/IntroSequence';
 import { characters } from './data/characters';
 import { items as allItemPool } from './data/items';
 import { playSound } from './engine/SoundManager';
-import { INITIAL_RESOURCES, BETWEEN_FIGHT_HEAL, MAX_BODY, MAX_GUARD, MAX_COMPOSURE, MAX_STAMINA, PRIZE_MONEY, TECH_CAPACITY, TECH_ENHANCEMENTS, loadMeta, saveMeta } from './data/constants';
+import { MAX_BODY, PRIZE_MONEY, TECH_CAPACITY, TECH_ENHANCEMENTS, loadMeta, saveMeta } from './data/constants';
 
 const STANDARD_SPECIES = ['cyberGorilla', 'psychoSquid', 'beeSwarm', 'terrorPinTurtle'];
 const COUNTER_SPECIES = ['echomorph', 'hydravine'];
@@ -57,9 +58,6 @@ export default function App() {
   const [techPoints, setTechPoints] = useState(0);
   const [playerTech, setPlayerTech] = useState([]); // installed tech enhancement IDs
   const [techFlashMsg, setTechFlashMsg] = useState(null); // flash message for move transformations
-
-  // Player resources that persist between fights
-  const [playerResources, setPlayerResources] = useState({ ...INITIAL_RESOURCES });
 
   // Map mutation slot names to compositor slot names
   // Mutations use 'arms'; compositor uses 'leftArm'/'rightArm'
@@ -124,7 +122,6 @@ export default function App() {
     setCredits(0);
     setTechPoints(0);
     setPlayerTech([]);
-    setPlayerResources({ ...INITIAL_RESOURCES });
 
     // Start with 1 random item
     const randomItem = allItemPool[Math.floor(Math.random() * allItemPool.length)];
@@ -213,11 +210,18 @@ export default function App() {
   function handleFightEnd(result) {
     const oppKey = arenaStates[currentArena].opponent;
 
-    // Remove moves from destroyed mutations
+    // Remove moves, mutations, and tech from destroyed mutations
     if (result.destroyedMutations?.length > 0) {
       const destroyedIds = new Set(result.destroyedMutations);
       setPlayerMoves(prev => prev.filter(m => !destroyedIds.has(m.id)));
-      setMutations(prev => prev.filter(m => !destroyedIds.has(m.id)));
+      setMutations(prev => {
+        const destroyed = prev.filter(m => destroyedIds.has(m.id));
+        const destroyedSlots = new Set(destroyed.map(m => m.slot).filter(Boolean));
+        if (destroyedSlots.size > 0) {
+          setPlayerTech(pt => pt.filter(t => !destroyedSlots.has(t.slot)));
+        }
+        return prev.filter(m => !destroyedIds.has(m.id));
+      });
     }
 
     // Compute kill method for harvest
@@ -276,14 +280,6 @@ export default function App() {
   }
 
   function handleHarvestDone() {
-    // Partial resource restore between fights
-    setPlayerResources(prev => ({
-      guard: BETWEEN_FIGHT_HEAL.guard,
-      composure: BETWEEN_FIGHT_HEAL.composure,
-      body: Math.min(MAX_BODY, prev.body + BETWEEN_FIGHT_HEAL.body),
-      stamina: BETWEEN_FIGHT_HEAL.stamina,
-    }));
-
     localStorage.setItem('ama_has_played', 'true');
     localStorage.setItem('ama_first_run', 'false');
     fadeToScreen('overworld');
@@ -365,13 +361,15 @@ export default function App() {
                   }
                 }}
                 onRemoveMutation={(mutationId) => {
-                  setMutations(prev => prev.filter(m => m.id !== mutationId));
+                  // Find slot BEFORE filtering so we can cascade tech removal
+                  setMutations(prev => {
+                    const mut = prev.find(m => m.id === mutationId);
+                    if (mut?.slot) {
+                      setPlayerTech(pt => pt.filter(t => t.slot !== mut.slot));
+                    }
+                    return prev.filter(m => m.id !== mutationId);
+                  });
                   setPlayerMoves(prev => prev.filter(m => m.id !== mutationId));
-                  // Also remove any tech installed on that mutation's slot
-                  const mut = mutations.find(m => m.id === mutationId);
-                  if (mut?.slot) {
-                    setPlayerTech(prev => prev.filter(t => t.slot !== mut.slot));
-                  }
                 }}
                 onBuyTech={(tech, slot) => {
                   setCredits(prev => prev - tech.cost);
@@ -425,6 +423,8 @@ export default function App() {
                           <button
                             disabled={!canAfford}
                             onClick={() => {
+                              // Re-validate before purchase (guard against stale UI)
+                              if (credits < tech.cost || playerTech.some(t => t.techId === tech.id)) return;
                               setCredits(prev => prev - tech.cost);
                               setTechPoints(prev => prev + tech.techCost);
                               setPlayerTech(prev => [...prev, { techId: tech.id, slot: tech.compatible }]);
@@ -669,10 +669,12 @@ export default function App() {
           onHarvest={(mutation, replacingId) => {
             // If replacing, remove old mutation first (cascades tech)
             if (replacingId) {
-              setMutations(prev => prev.filter(m => m.id !== replacingId));
+              setMutations(prev => {
+                const old = prev.find(m => m.id === replacingId);
+                if (old?.slot) setPlayerTech(pt => pt.filter(t => t.slot !== old.slot));
+                return prev.filter(m => m.id !== replacingId);
+              });
               setPlayerMoves(prev => prev.filter(m => m.id !== replacingId));
-              const old = mutations.find(m => m.id === replacingId);
-              if (old?.slot) setPlayerTech(prev => prev.filter(t => t.slot !== old.slot));
             }
             // Add new mutation
             setMutations(prev => [...prev, mutation]);
@@ -689,43 +691,25 @@ export default function App() {
         <VictoryScreen
           stats={runStats}
           mutations={mutations}
+          playerSpecies={selectedSpecies}
+          scars={scars}
+          meta={meta}
+          techCount={playerTech?.length || 0}
           onNewRun={() => setScreen('select')}
         />
       )}
 
       {screen === 'defeat' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 20 }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 800, color: 'var(--lose)' }}>DEFEATED</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Survived {runStats.defeated.length} fight{runStats.defeated.length !== 1 ? 's' : ''} | {runStats.totalTurns} total turns
-          </p>
-          {/* Commander Vex commentary */}
-          <div style={{
-            background: '#0a1220', border: '1px solid #1a2838', borderLeft: '2px solid #aa66ee',
-            padding: '14px 20px', maxWidth: 480, textAlign: 'left',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#aa66ee', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Commander Vex</div>
-            <div style={{ fontSize: 12, color: '#6a8a9a', fontStyle: 'italic', lineHeight: 1.6 }}>
-              {(() => {
-                const runs = meta.totalRuns || 0;
-                const losses = meta.totalLosses || 0;
-                const wins = meta.totalWins || 0;
-                if (runs <= 1) return '"Get up." ... "Or don\'t. There\'s always next season."';
-                if (losses >= 3 && wins === 0) return '"Persistence. I respect that more than talent. But talent would help."';
-                if (wins >= 3) return '"Even champions fall. The crowd remembers your record, not this."';
-                if (runs >= 10) return '"At this point the tournament is YOUR story. Write a better chapter."';
-                return `"Run ${runs}. Record: ${wins}-${losses}. Get back in there."`;
-              })()}
-            </div>
-          </div>
-          <button
-            onClick={() => setScreen('select')}
-            className="btn"
-            style={{ marginTop: 20, padding: '14px 32px', fontSize: 14, fontWeight: 700 }}
-          >
-            New Run
-          </button>
-        </div>
+        <DefeatScreen
+          stats={runStats}
+          playerSpecies={selectedSpecies}
+          killedBy={arenaStates[currentArena]?.opponent}
+          mutations={mutations}
+          scars={scars}
+          meta={meta}
+          fightNumber={currentArena != null ? currentArena + 1 : 1}
+          onNewRun={() => setScreen('select')}
+        />
       )}
     </div>
   );
