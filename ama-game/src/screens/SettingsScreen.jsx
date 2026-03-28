@@ -99,7 +99,7 @@ export default function SettingsScreen({ meta, onClose }) {
           <StatLine label="Wins" value={wins} color="#00ff88" />
           <StatLine label="Losses" value={losses} color="#ee6666" />
           <StatLine label="Win Rate" value={runs > 0 ? `${Math.round((wins / runs) * 100)}%` : '—'} />
-          <StatLine label="Best Run" value={`${bestRun}/4 fights`} />
+          <StatLine label="Best Run" value={`${bestRun}/8 fights`} />
         </Section>
 
         {/* Codex Summary */}

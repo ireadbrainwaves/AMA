@@ -15,24 +15,62 @@ import { items as allItemPool } from './data/items';
 import { playSound } from './engine/SoundManager';
 import { playMusic } from './engine/MusicManager';
 import { saveRun, loadRun, clearSave } from './engine/SaveManager';
-import { MAX_BODY, PRIZE_MONEY, TECH_CAPACITY, TECH_ENHANCEMENTS, loadMeta, saveMeta } from './data/constants';
+import { MAX_BODY, PRIZE_MONEY, TECH_CAPACITY, TECH_ENHANCEMENTS, TOTAL_FIGHTS, UNLOCKABLE_SPECIES, loadMeta, saveMeta } from './data/constants';
 
-const STANDARD_SPECIES = ['cyberGorilla', 'psychoSquid', 'beeSwarm', 'terrorPinTurtle'];
+// Species pools for arena generation
+const STANDARD_SPECIES = ['cyberGorilla', 'psychoSquid', 'beeSwarm', 'terrorPinTurtle', 'ironMantis', 'voltamander', 'mycelith'];
 const COUNTER_SPECIES = ['echomorph', 'hydravine'];
+const MINIBOSS_SPECIES = ['glassViper', 'nullWorm'];
+const BOSS_SPECIES = ['boneHydra'];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 function generateArenaStates(playerSpecies) {
   const standard = STANDARD_SPECIES.filter(s => s !== playerSpecies);
-  return [0, 1, 2, 3].map(i => {
+  const shuffledStandard = shuffleArray(standard);
+  const shuffledCounter = shuffleArray(COUNTER_SPECIES);
+  const shuffledMiniboss = shuffleArray(MINIBOSS_SPECIES);
+  const usedOpponents = new Set();
+
+  function pickUnique(pool) {
+    for (const s of pool) {
+      if (!usedOpponents.has(s)) { usedOpponents.add(s); return s; }
+    }
+    // fallback: random from pool
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  return Array.from({ length: TOTAL_FIGHTS }, (_, i) => {
     let opponent;
-    if (i <= 1) {
-      // Fights 1-2: standard species
-      opponent = standard[Math.floor(Math.random() * standard.length)];
-    } else if (i === 2) {
-      // Fight 3: standard or counter-mechanic (50/50)
-      const pool = Math.random() < 0.5 ? COUNTER_SPECIES : standard;
-      opponent = pool[Math.floor(Math.random() * pool.length)];
+    if (i <= 2) {
+      // Fights 1-3: standard species (no repeats)
+      opponent = pickUnique(shuffledStandard);
+    } else if (i === 3) {
+      // Fight 4: counter-mechanic
+      opponent = pickUnique(shuffledCounter);
+    } else if (i === 4) {
+      // Fight 5: another standard or remaining counter
+      const pool = Math.random() < 0.5
+        ? shuffledStandard.filter(s => !usedOpponents.has(s))
+        : shuffledCounter.filter(s => !usedOpponents.has(s));
+      opponent = pool.length > 0 ? pickUnique(pool) : pickUnique(shuffledStandard);
+    } else if (i <= 6) {
+      // Fights 6-7: mini-boss / boss tier
+      if (i === 5) {
+        opponent = pickUnique(shuffledMiniboss);
+      } else {
+        // Fight 7: Bone Hydra
+        opponent = pickUnique(BOSS_SPECIES);
+      }
     } else {
-      // Fight 4 (boss): always Parasitex
+      // Fight 8: always Parasitex (final boss)
       opponent = 'parasitex';
     }
     return { id: i, opponent, cleared: false };
@@ -322,10 +360,20 @@ export default function App() {
     const prize = PRIZE_MONEY[fightNum] || 0;
     if (prize > 0) setCredits(prev => prev + prize);
 
-    if (newCleared >= 4) {
+    // Unlock defeated species if not already unlocked
+    const oppSpecies = arenaStates[currentArena].opponent;
+    if (!meta.unlockedSpecies?.includes(oppSpecies)) {
+      setMeta(prev => {
+        const updated = { ...prev, unlockedSpecies: [...(prev.unlockedSpecies || []), oppSpecies] };
+        saveMeta(updated);
+        return updated;
+      });
+    }
+
+    if (newCleared >= TOTAL_FIGHTS) {
       // Update meta wins
       setMeta(prev => {
-        const updated = { ...prev, totalWins: (prev.totalWins || 0) + 1, bestRun: Math.max(prev.bestRun || 0, 4) };
+        const updated = { ...prev, totalWins: (prev.totalWins || 0) + 1, bestRun: Math.max(prev.bestRun || 0, TOTAL_FIGHTS) };
         saveMeta(updated);
         return updated;
       });
@@ -520,7 +568,7 @@ export default function App() {
                     {techFlashMsg}
                   </div>
                 )}
-                <button onClick={closeHubOverlay} className="btn" style={{ marginTop: 16, borderColor: 'var(--amber)', color: 'var(--amber)' }}>
+                <button onClick={closeHubOverlay} className="btn-ghost" style={{ marginTop: 16 }}>
                   Done
                 </button>
               </div>
@@ -543,7 +591,7 @@ export default function App() {
                     </div>
                   ))
                 )}
-                <button onClick={closeHubOverlay} style={{ marginTop: 16, padding: '8px 24px', background: 'transparent', border: '1px solid var(--cyan)', color: 'var(--cyan)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase' }}>
+                <button onClick={closeHubOverlay} className="btn-ghost" style={{ marginTop: 16 }}>
                   Close
                 </button>
               </div>
@@ -565,7 +613,7 @@ export default function App() {
                 )) : (
                   <div style={{ color: 'var(--text-ghost)', fontSize: 11 }}>No items. Visit Dr. Helix to purchase.</div>
                 )}
-                <button onClick={closeHubOverlay} style={{ marginTop: 16, padding: '8px 24px', background: 'transparent', border: '1px solid var(--amber)', color: 'var(--amber)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase' }}>
+                <button onClick={closeHubOverlay} className="btn-ghost" style={{ marginTop: 16 }}>
                   Close
                 </button>
               </div>
@@ -672,12 +720,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <button onClick={closeHubOverlay} style={{
-                  marginTop: 20, padding: '8px 28px', background: 'transparent',
-                  border: '1px solid #00ffee', color: '#00ffee', fontSize: 11,
-                  letterSpacing: 2, textTransform: 'uppercase', cursor: 'pointer',
-                  fontFamily: '"Share Tech Mono", monospace',
-                }}>
+                <button onClick={closeHubOverlay} className="btn-ghost" style={{ marginTop: 20 }}>
                   Close
                 </button>
               </div>

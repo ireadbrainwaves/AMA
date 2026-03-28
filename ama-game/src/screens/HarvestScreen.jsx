@@ -240,12 +240,8 @@ export default function HarvestScreen({
               <button
                 onClick={() => handleHarvest(mut)}
                 disabled={grafting}
-                style={{
-                  width: '100%', padding: '8px 0', background: 'transparent',
-                  border: '1px solid #2a8a55', color: '#66ee88',
-                  fontFamily: "'Share Tech Mono', monospace", fontSize: 11,
-                  letterSpacing: 2, textTransform: 'uppercase', cursor: 'pointer',
-                }}
+                className="btn graft"
+                style={{ width: '100%' }}
               >
                 Harvest
               </button>
@@ -280,15 +276,10 @@ export default function HarvestScreen({
       <button
         onClick={onSkip}
         disabled={grafting}
-        style={{
-          padding: '8px 24px', background: 'transparent',
-          border: '1px solid #1a2838', color: '#4a6a7a',
-          fontFamily: "'Share Tech Mono', monospace", fontSize: 11,
-          letterSpacing: 2, textTransform: 'uppercase', cursor: 'pointer',
-          position: 'relative', zIndex: 1,
-        }}
+        className="btn-ghost"
+        style={{ position: 'relative', zIndex: 1 }}
       >
-        Skip — Return to Hub
+        Skip - Return to Hub
       </button>
     </div>
   );

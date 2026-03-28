@@ -1,0 +1,481 @@
+{
+  "objects": {
+    "npc_helix": {
+      "id": "5561b997-6d50-4778-9cb2-c78bdb240206",
+      "status": "downloaded",
+      "created": "2026-03-27T20:01:49.721Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/5561b997-6d50-4778-9cb2-c78bdb240206/download"
+    },
+    "npc_ark": {
+      "id": "21d0e82d-e671-4ab9-b4ab-951bfddcfa7f",
+      "status": "downloaded",
+      "created": "2026-03-27T20:01:49.970Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/21d0e82d-e671-4ab9-b4ab-951bfddcfa7f/download"
+    },
+    "npc_vex": {
+      "id": "cab845a0-6292-4e8b-b263-a68266029ae8",
+      "status": "downloaded",
+      "created": "2026-03-27T20:01:50.229Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/cab845a0-6292-4e8b-b263-a68266029ae8/download"
+    },
+    "bio_tank": {
+      "id": "d189b236-0bc3-4eb4-a453-e638e413ab65",
+      "status": "downloaded",
+      "created": "2026-03-27T20:01:50.473Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/d189b236-0bc3-4eb4-a453-e638e413ab65/download"
+    },
+    "lab_bench": {
+      "id": "c626d6ae-edd8-402c-acd0-e775fd711860",
+      "status": "downloaded",
+      "created": "2026-03-27T20:01:50.717Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/c626d6ae-edd8-402c-acd0-e775fd711860/download"
+    },
+    "weapon_rack": {
+      "id": "5e959a33-43b6-455d-b2c1-093a295bd3fe",
+      "status": "downloaded",
+      "created": "2026-03-27T20:34:13.371Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/5e959a33-43b6-455d-b2c1-093a295bd3fe/download"
+    },
+    "tech_workbench": {
+      "id": "704a853a-8a0f-4ea9-ab15-dbfff6934a91",
+      "status": "downloaded",
+      "created": "2026-03-27T20:34:13.608Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/704a853a-8a0f-4ea9-ab15-dbfff6934a91/download"
+    },
+    "tech_crate": {
+      "id": "165b145f-f64d-41b0-960e-4fc92192d4b9",
+      "status": "downloaded",
+      "created": "2026-03-27T20:34:13.847Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/165b145f-f64d-41b0-960e-4fc92192d4b9/download"
+    },
+    "cmd_console": {
+      "id": "11c9db55-84a9-41c3-93ed-b7cbd41de62e",
+      "status": "downloaded",
+      "created": "2026-03-27T20:34:14.101Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/11c9db55-84a9-41c3-93ed-b7cbd41de62e/download"
+    },
+    "terminal": {
+      "id": "15633c01-13a5-49aa-8830-9aa073e9a88c",
+      "status": "downloaded",
+      "created": "2026-03-27T20:34:14.346Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/15633c01-13a5-49aa-8830-9aa073e9a88c/download"
+    },
+    "arena_door": {
+      "id": "daf324d7-0868-4da8-b5ba-80255d8db1a3",
+      "status": "downloaded",
+      "created": "2026-03-27T20:53:41.072Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/daf324d7-0868-4da8-b5ba-80255d8db1a3/download"
+    },
+    "holo_display": {
+      "id": "f826820d-95be-4d58-9eea-32c0c14400a8",
+      "status": "downloaded",
+      "created": "2026-03-27T20:53:41.332Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/f826820d-95be-4d58-9eea-32c0c14400a8/download"
+    },
+    "player": {
+      "id": "f018de8b-1039-4210-bd84-4fd900cb63bf",
+      "status": "downloaded",
+      "created": "2026-03-27T20:53:41.586Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/f018de8b-1039-4210-bd84-4fd900cb63bf/download"
+    },
+    "room_cmdpost": {
+      "id": "97d774d6-a680-40b5-9df0-eaf2c24c4d0d",
+      "status": "downloaded",
+      "created": "2026-03-27T21:45:09.792Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/97d774d6-a680-40b5-9df0-eaf2c24c4d0d/download"
+    },
+    "room_mainhall": {
+      "id": "46435dc2-0db0-4c96-be1d-96e1b541bb6d",
+      "status": "downloaded",
+      "created": "2026-03-27T21:45:10.629Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/46435dc2-0db0-4c96-be1d-96e1b541bb6d/download"
+    },
+    "room_mutlab": {
+      "id": "d4a43c5e-082c-413e-a9ba-566178aafbc8",
+      "status": "downloaded",
+      "created": "2026-03-27T22:07:36.378Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/d4a43c5e-082c-413e-a9ba-566178aafbc8/download"
+    },
+    "room_workshop": {
+      "id": "5aa5c99b-a0f4-4f5f-bbbd-8588cdfbeef9",
+      "status": "downloaded",
+      "created": "2026-03-27T22:36:50.112Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/5aa5c99b-a0f4-4f5f-bbbd-8588cdfbeef9/download"
+    },
+    "room_arena": {
+      "id": "edc402d9-7382-4474-b3de-5ad8cf9c4443",
+      "status": "downloaded",
+      "created": "2026-03-27T22:43:32.206Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/edc402d9-7382-4474-b3de-5ad8cf9c4443/download"
+    },
+    "elevator_pad": {
+      "id": "5120e9e4-e88f-4b3c-8f28-6374c87857a3",
+      "status": "downloaded",
+      "created": "2026-03-27T23:00:51.817Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/5120e9e4-e88f-4b3c-8f28-6374c87857a3/download"
+    },
+    "gorilla_back": {
+      "id": "0c4f80ea-5290-46b2-8a35-3c12f64346ce",
+      "status": "downloaded",
+      "created": "2026-03-27T23:25:41.476Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/0c4f80ea-5290-46b2-8a35-3c12f64346ce/download"
+    },
+    "bee_back": {
+      "id": "7591fc3a-ee7a-4568-acf3-57417359ff2c",
+      "status": "downloaded",
+      "created": "2026-03-27T23:25:43.058Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/7591fc3a-ee7a-4568-acf3-57417359ff2c/download"
+    },
+    "turtle_back": {
+      "id": "a73f7f21-04aa-4085-898f-4f898a9d9ff3",
+      "status": "downloaded",
+      "created": "2026-03-27T23:25:43.862Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/a73f7f21-04aa-4085-898f-4f898a9d9ff3/download"
+    },
+    "mantis_back": {
+      "id": "ef9ec5c2-4d70-4345-ad86-2920af3da06b",
+      "status": "downloaded",
+      "created": "2026-03-27T23:25:44.663Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/ef9ec5c2-4d70-4345-ad86-2920af3da06b/download"
+    },
+    "squid_back": {
+      "id": "79f5f225-1250-42e3-80ed-36f72687f85e",
+      "status": "downloaded",
+      "created": "2026-03-27T23:33:13.821Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/79f5f225-1250-42e3-80ed-36f72687f85e/download"
+    },
+    "voltamander_back": {
+      "id": "c5a8fd24-5e7a-4f1d-bcfb-fa9cbffa93d5",
+      "status": "downloaded",
+      "created": "2026-03-27T23:33:14.638Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/c5a8fd24-5e7a-4f1d-bcfb-fa9cbffa93d5/download"
+    },
+    "mycelith_back": {
+      "id": "7e592da9-c348-460a-9517-fddcb777df1d",
+      "status": "downloaded",
+      "created": "2026-03-27T23:33:15.458Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/7e592da9-c348-460a-9517-fddcb777df1d/download"
+    },
+    "mut_iron_knuckles": {
+      "id": "24133def-a9af-418d-ba42-d2cf6818be7e",
+      "status": "downloaded",
+      "created": "2026-03-27T23:38:56.871Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/24133def-a9af-418d-ba42-d2cf6818be7e/download"
+    },
+    "mut_berserker_cortex": {
+      "id": "d7cdb545-6d67-4a07-8992-9c3a1457c5a3",
+      "status": "downloaded",
+      "created": "2026-03-27T23:38:57.692Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/d7cdb545-6d67-4a07-8992-9c3a1457c5a3/download"
+    },
+    "mut_barrel_chest": {
+      "id": "59e7af98-378c-4be1-a9ef-9b352a28952f",
+      "status": "downloaded",
+      "created": "2026-03-27T23:38:58.499Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/59e7af98-378c-4be1-a9ef-9b352a28952f/download"
+    },
+    "mut_ground_stomp": {
+      "id": "6bcd0fd5-a82c-457e-858a-21637ba5d660",
+      "status": "downloaded",
+      "created": "2026-03-27T23:38:59.296Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/6bcd0fd5-a82c-457e-858a-21637ba5d660/download"
+    },
+    "mut_tentacle_graft": {
+      "id": "ad1ed778-8dc8-4c1d-a686-959527f3234e",
+      "status": "downloaded",
+      "created": "2026-03-27T23:39:00.110Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/ad1ed778-8dc8-4c1d-a686-959527f3234e/download"
+    },
+    "mut_psionic_amplifier": {
+      "id": "05158608-191c-4539-9bce-aae82a71997e",
+      "status": "downloaded",
+      "created": "2026-03-27T23:54:21.574Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/05158608-191c-4539-9bce-aae82a71997e/download"
+    },
+    "mut_chromatophore_cloak": {
+      "id": "13403d06-36d5-49d9-90db-07a2ef726bc1",
+      "status": "downloaded",
+      "created": "2026-03-27T23:54:21.816Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/13403d06-36d5-49d9-90db-07a2ef726bc1/download"
+    },
+    "mut_jet_siphon": {
+      "id": "903b4c10-193f-4018-9b5f-3809400ece20",
+      "status": "downloaded",
+      "created": "2026-03-27T23:54:22.050Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/903b4c10-193f-4018-9b5f-3809400ece20/download"
+    },
+    "mut_stinger_arms": {
+      "id": "b82dd417-a27b-46fd-aaed-ed8e5378c5e6",
+      "status": "downloaded",
+      "created": "2026-03-27T23:54:22.282Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/b82dd417-a27b-46fd-aaed-ed8e5378c5e6/download"
+    },
+    "mut_swarm_sense": {
+      "id": "df2976f4-b593-4f46-89c3-b48d7c79cfa2",
+      "status": "downloaded",
+      "created": "2026-03-27T23:54:22.517Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/df2976f4-b593-4f46-89c3-b48d7c79cfa2/download"
+    },
+    "mut_swarm_redistribution": {
+      "id": "828c067b-1cf8-4f99-8431-bee82467aee7",
+      "status": "downloaded",
+      "created": "2026-03-28T00:12:06.043Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/828c067b-1cf8-4f99-8431-bee82467aee7/download"
+    },
+    "mut_wing_cluster": {
+      "id": "c88ed540-f7f9-4c73-99bc-b549346e2f2d",
+      "status": "downloaded",
+      "created": "2026-03-28T00:12:06.279Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/c88ed540-f7f9-4c73-99bc-b549346e2f2d/download"
+    },
+    "mut_shell_gauntlets": {
+      "id": "bd45e29a-9e71-42ec-b23a-46fda1952b66",
+      "status": "downloaded",
+      "created": "2026-03-28T00:12:06.514Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/bd45e29a-9e71-42ec-b23a-46fda1952b66/download"
+    },
+    "mut_iron_dome": {
+      "id": "a4a68f38-f047-4f6f-926f-4204ea7ad7a7",
+      "status": "downloaded",
+      "created": "2026-03-28T00:12:06.749Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/a4a68f38-f047-4f6f-926f-4204ea7ad7a7/download"
+    },
+    "mut_fortress_protocol": {
+      "id": "9ca9d792-a1e4-46c5-bbc0-9aaf1e3f049f",
+      "status": "downloaded",
+      "created": "2026-03-28T00:12:07.015Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/9ca9d792-a1e4-46c5-bbc0-9aaf1e3f049f/download"
+    },
+    "mut_anchor_legs": {
+      "id": "367d52f8-6a09-4d06-9dda-748bdc605589",
+      "status": "downloaded",
+      "created": "2026-03-28T00:15:41.437Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/367d52f8-6a09-4d06-9dda-748bdc605589/download"
+    },
+    "mut_reactive_membrane": {
+      "id": "8b389ce0-b792-4059-8c11-15063953b42e",
+      "status": "downloaded",
+      "created": "2026-03-28T00:15:45.359Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/8b389ce0-b792-4059-8c11-15063953b42e/download"
+    },
+    "mut_mirror_reflex": {
+      "id": "28059f7c-282d-4ec2-ac2b-e7d21b139725",
+      "status": "downloaded",
+      "created": "2026-03-28T00:15:45.608Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/28059f7c-282d-4ec2-ac2b-e7d21b139725/download"
+    },
+    "mut_echo_core": {
+      "id": "a17e6b85-7148-45a9-9053-e552783c0b52",
+      "status": "downloaded",
+      "created": "2026-03-28T00:15:45.846Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/a17e6b85-7148-45a9-9053-e552783c0b52/download"
+    },
+    "mut_regenerative_membrane": {
+      "id": "df377fd6-66ed-4b64-8862-379d3dc7c6d5",
+      "status": "downloaded",
+      "created": "2026-03-28T00:15:46.088Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/df377fd6-66ed-4b64-8862-379d3dc7c6d5/download"
+    },
+    "mut_thorn_bark": {
+      "id": "8f6dac7e-d87a-45fe-a087-bbd14b683112",
+      "status": "downloaded",
+      "created": "2026-03-28T00:18:11.274Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/8f6dac7e-d87a-45fe-a087-bbd14b683112/download"
+    },
+    "mut_deep_roots": {
+      "id": "50d03510-b78d-4cef-a81d-a0719c71f864",
+      "status": "downloaded",
+      "created": "2026-03-28T00:18:11.524Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/50d03510-b78d-4cef-a81d-a0719c71f864/download"
+    },
+    "mut_hydraulic_pincers": {
+      "id": "7b6a7296-ad85-4d57-82dc-90a305a20412",
+      "status": "downloaded",
+      "created": "2026-03-28T00:18:11.793Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/7b6a7296-ad85-4d57-82dc-90a305a20412/download"
+    },
+    "mut_compound_eyes": {
+      "id": "7ee626da-584b-4f64-bd5f-3b5cccf01033",
+      "status": "downloaded",
+      "created": "2026-03-28T00:18:12.118Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/7ee626da-584b-4f64-bd5f-3b5cccf01033/download"
+    },
+    "mut_carapace_plating": {
+      "id": "3f10ebe0-3ccf-4cf6-96e0-82759e617de2",
+      "status": "downloaded",
+      "created": "2026-03-28T00:18:12.355Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/3f10ebe0-3ccf-4cf6-96e0-82759e617de2/download"
+    },
+    "mut_anchor_claws": {
+      "id": "b6676b60-7364-41c7-80c8-5b0188d9bd7c",
+      "status": "downloaded",
+      "created": "2026-03-28T00:22:04.198Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/b6676b60-7364-41c7-80c8-5b0188d9bd7c/download"
+    },
+    "mut_spark_arms": {
+      "id": "b6a8bb47-48d3-48a8-a2ee-dc8fcedae13d",
+      "status": "downloaded",
+      "created": "2026-03-28T00:22:04.498Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/b6a8bb47-48d3-48a8-a2ee-dc8fcedae13d/download"
+    },
+    "mut_bioelectric_nodes": {
+      "id": "2a3b3881-52a1-476b-ae34-0d1e51180562",
+      "status": "downloaded",
+      "created": "2026-03-28T00:22:04.736Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/2a3b3881-52a1-476b-ae34-0d1e51180562/download"
+    },
+    "mut_conductive_skin": {
+      "id": "7ee611f7-8931-4107-b04f-8b425c607c22",
+      "status": "downloaded",
+      "created": "2026-03-28T00:22:07.500Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/7ee611f7-8931-4107-b04f-8b425c607c22/download"
+    },
+    "mut_capacitor_tail": {
+      "id": "bc2f113e-dc1e-486d-ab1e-b9f855183743",
+      "status": "downloaded",
+      "created": "2026-03-28T00:22:07.738Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/bc2f113e-dc1e-486d-ab1e-b9f855183743/download"
+    },
+    "mut_spore_sacs": {
+      "id": "a78abfec-cdaf-4e19-80b3-57005023e3c3",
+      "status": "downloaded",
+      "created": "2026-03-28T00:26:16.957Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/a78abfec-cdaf-4e19-80b3-57005023e3c3/download"
+    },
+    "mut_decomposer_node": {
+      "id": "63c6567a-ff7f-4435-a49c-9246b958417a",
+      "status": "downloaded",
+      "created": "2026-03-28T00:26:17.198Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/63c6567a-ff7f-4435-a49c-9246b958417a/download"
+    },
+    "mut_cap_shield": {
+      "id": "e848b131-3aa6-43c5-a6c6-dbd63e72b3f6",
+      "status": "downloaded",
+      "created": "2026-03-28T00:26:21.592Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/e848b131-3aa6-43c5-a6c6-dbd63e72b3f6/download"
+    },
+    "mut_mycelium_network": {
+      "id": "6d2f849e-5a16-44d3-ac0d-2b41d315589e",
+      "status": "downloaded",
+      "created": "2026-03-28T00:26:21.826Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/6d2f849e-5a16-44d3-ac0d-2b41d315589e/download"
+    },
+    "mut_glass_fang": {
+      "id": "f65b622b-289e-4e84-974d-d46b89193df7",
+      "status": "downloaded",
+      "created": "2026-03-28T00:26:22.066Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/f65b622b-289e-4e84-974d-d46b89193df7/download"
+    },
+    "mut_refraction_skin": {
+      "id": "3c905236-0494-4ffc-a4c6-e13c8ddc8f87",
+      "status": "downloaded",
+      "created": "2026-03-28T00:28:32.600Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/3c905236-0494-4ffc-a4c6-e13c8ddc8f87/download"
+    },
+    "mut_venom_glands": {
+      "id": "473d658a-9241-4a20-9b69-d27627150415",
+      "status": "downloaded",
+      "created": "2026-03-28T00:28:32.833Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/473d658a-9241-4a20-9b69-d27627150415/download"
+    },
+    "mut_void_segment": {
+      "id": "c87d6999-b1b7-44d1-8a5e-86f8dfaca2fd",
+      "status": "downloaded",
+      "created": "2026-03-28T00:28:33.084Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/c87d6999-b1b7-44d1-8a5e-86f8dfaca2fd/download"
+    },
+    "mut_null_tooth": {
+      "id": "4d3606c8-c701-4b97-8119-68744b2ec107",
+      "status": "downloaded",
+      "created": "2026-03-28T00:28:33.323Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/4d3606c8-c701-4b97-8119-68744b2ec107/download"
+    },
+    "mut_absence_lobe": {
+      "id": "246f8396-ca32-4693-826b-b2c71487a727",
+      "status": "downloaded",
+      "created": "2026-03-28T00:28:33.568Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/246f8396-ca32-4693-826b-b2c71487a727/download"
+    },
+    "mut_hydra_skull": {
+      "id": "612e0a13-0999-47a0-b77b-680fe8da9a2a",
+      "status": "downloaded",
+      "created": "2026-03-28T00:37:21.769Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/612e0a13-0999-47a0-b77b-680fe8da9a2a/download"
+    },
+    "mut_ribcage_armor": {
+      "id": "6be4f8d0-3a76-462f-8e23-5bb0b7fdf657",
+      "status": "downloaded",
+      "created": "2026-03-28T00:37:23.088Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/6be4f8d0-3a76-462f-8e23-5bb0b7fdf657/download"
+    },
+    "mut_bone_claw": {
+      "id": "4a095bd9-ffe6-4b00-8b2d-e4afa0ad5740",
+      "status": "downloaded",
+      "created": "2026-03-28T00:37:23.369Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/4a095bd9-ffe6-4b00-8b2d-e4afa0ad5740/download"
+    },
+    "mut_parasitic_link": {
+      "id": "5e5ec6bd-58b6-4a95-89bc-541d60a5a2f9",
+      "status": "downloaded",
+      "created": "2026-03-28T00:37:23.605Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/5e5ec6bd-58b6-4a95-89bc-541d60a5a2f9/download"
+    },
+    "mut_chitin_exoframe": {
+      "id": "711e6856-41f1-4386-8737-38789ee6629c",
+      "status": "downloaded",
+      "created": "2026-03-28T00:37:23.836Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/711e6856-41f1-4386-8737-38789ee6629c/download"
+    },
+    "mut_parasitic_drain": {
+      "id": "3e8f58e4-aebc-40c8-8862-608ab1834db7",
+      "status": "downloaded",
+      "created": "2026-03-28T00:54:53.059Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/3e8f58e4-aebc-40c8-8862-608ab1834db7/download"
+    }
+  },
+  "tilesets": {
+    "base_floor": {
+      "id": "32b21288-26e5-4717-9920-c97a874b7e99",
+      "status": "downloaded",
+      "created": "2026-03-27T21:10:29.702Z",
+      "url": "https://api.pixellab.ai/mcp/tilesets/32b21288-26e5-4717-9920-c97a874b7e99/image"
+    },
+    "corridor": {
+      "id": "67f804d5-070c-4859-921e-0ab17d37de6e",
+      "status": "downloaded",
+      "created": "2026-03-27T21:10:30.002Z",
+      "url": "https://api.pixellab.ai/mcp/tilesets/67f804d5-070c-4859-921e-0ab17d37de6e/image"
+    },
+    "hall_floor": {
+      "id": "869f40b7-a970-421f-b7a8-5a796d6842cd",
+      "status": "downloaded",
+      "created": "2026-03-27T21:10:30.259Z",
+      "url": "https://api.pixellab.ai/mcp/tilesets/869f40b7-a970-421f-b7a8-5a796d6842cd/image"
+    },
+    "bio_floor": {
+      "id": "bb1b6386-8363-452e-9375-bf87fd62bc01",
+      "status": "downloaded",
+      "created": "2026-03-27T21:10:30.510Z",
+      "url": "https://api.pixellab.ai/mcp/tilesets/bb1b6386-8363-452e-9375-bf87fd62bc01/image"
+    },
+    "tech_floor": {
+      "id": "addabb30-6a51-47c0-a99c-4fe2c585193e",
+      "status": "downloaded",
+      "created": "2026-03-27T21:10:30.763Z",
+      "url": "https://api.pixellab.ai/mcp/tilesets/addabb30-6a51-47c0-a99c-4fe2c585193e/image"
+    },
+    "cmd_floor": {
+      "id": "9361b417-12f6-4622-ba23-60fded97681f",
+      "status": "downloaded",
+      "created": "2026-03-27T21:10:31.725Z",
+      "url": "https://api.pixellab.ai/mcp/tilesets/9361b417-12f6-4622-ba23-60fded97681f/image"
+    },
+    "grate": {
+      "id": "eee6e240-898b-4d6a-9072-3009653ab30d",
+      "status": "downloaded",
+      "created": "2026-03-27T21:10:31.978Z",
+      "url": "https://api.pixellab.ai/mcp/tilesets/eee6e240-898b-4d6a-9072-3009653ab30d/image"
+    }
+  },
+  "downloaded": []
+}

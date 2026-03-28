@@ -71,13 +71,22 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
   const [scrambleActive, setScrambleActive] = useState(0);      // turns of forced random AI
   const [revealTurns, setRevealTurns] = useState(0);            // turns of seeing opponent's move
 
-  // Tutorial state
-  const isTutorial = isFirstFight === true;
-  const tutorialPhase = isTutorial ? getTutorialPhase(turn) : TUTORIAL_PHASES.FULL_SYSTEM;
-  const [tutorialHint, setTutorialHint] = useState(null);
+  // Tutorial disabled — always full system
+  const isTutorial = false;
+  const tutorialPhase = TUTORIAL_PHASES.FULL_SYSTEM;
 
   // Track last player move for Echomorph copycat
   const [lastPlayerMove, setLastPlayerMove] = useState(null);
+
+  // Flow Bonus: +1 base damage when using different move type than last turn
+  const [playerLastType, setPlayerLastType] = useState(null);
+  const [oppLastType, setOppLastType] = useState(null);
+
+  // Stamina interaction state: regen bonus/debuff from DEFENSE/PSYCHIC
+  const [playerRegenBonus, setPlayerRegenBonus] = useState(0);
+  const [oppRegenBonus, setOppRegenBonus] = useState(0);
+  const [playerRegenDebuff, setPlayerRegenDebuff] = useState(0);
+  const [oppRegenDebuff, setOppRegenDebuff] = useState(0);
 
   // Synapse Swap: indices of swapped moves on opponent (or player if opponent uses it)
   const [playerSwappedMoves, setPlayerSwappedMoves] = useState(null); // [idxA, idxB] or null
@@ -106,6 +115,26 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
   // Ghost move from Hydravine Spore Cloud
   const [ghostMove, setGhostMove] = useState(null);
+
+  // === NEW SPECIES PASSIVES ===
+  // Iron Mantis — Vice Grip: clamped mutations { mutId: turnsLeft }
+  const [clampedMutations, setClampedMutations] = useState({});
+  // Voltamander — Bioelectric Charge: 0-10
+  const [voltCharge, setVoltCharge] = useState(0);
+  // Mycelith — Sporulation: array of { id, hp, maxHp }
+  const [sporeConstructs, setSporeConstructs] = useState([]);
+  // Glass Viper — Stealth Strike
+  const [viperStealth, setViperStealth] = useState(() => opponentCharKey === 'glassViper');
+  const [viperVisibleTurns, setViperVisibleTurns] = useState(0);
+  // Bone Hydra — Regrowth: heads array [{ hp, maxHp, regenTimer, alive }]
+  const [hydraHeads, setHydraHeads] = useState(() =>
+    opponentCharKey === 'boneHydra' ? [
+      { hp: 8, maxHp: 8, regenTimer: 0, alive: true, moveIndex: 0 },
+      { hp: 8, maxHp: 8, regenTimer: 0, alive: true, moveIndex: 1 },
+      { hp: 8, maxHp: 8, regenTimer: 0, alive: true, moveIndex: 2 },
+    ] : []
+  );
+  // Null Worm — Null Field: strip techs at fight start (handled in move filtering)
 
   // Click-to-continue: tracks whether player has clicked through auto-advance phases
   const [waitingForClick, setWaitingForClick] = useState(false);
@@ -147,11 +176,12 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       mutations.forEach(m => {
         if ((m.type === 'ADD' || m.type === 'REPLACE' || m.type === 'SHIELD') && (m.move || m.shieldFor)) {
           let maxHP = m.hp || (m.type === 'REPLACE' ? MUTATION_HP_LARGE : MUTATION_HP_SMALL);
-          // Titanium Reinforcement tech: +5 HP
-          if (playerTech?.some(t => t.slot === m.slot && (TECH_ENHANCEMENTS[t.techId]?.effect === 'bonusHP' || Object.values(TECH_ENHANCEMENTS).find(e => e.id === t.techId)?.effect === 'bonusHP'))) {
-            maxHP += 5;
-          }
-          hp[m.id] = { maxHP, currentHP: maxHP, mutation: m, weakness: m.weakness || null, resistance: m.resistance || null, slot: m.slot || null, shieldFor: m.shieldFor || null };
+          hp[m.id] = {
+            maxHP, currentHP: maxHP, mutation: m, weakness: m.weakness || null,
+            resistance: m.resistance || null, slot: m.slot || null, shieldFor: m.shieldFor || null,
+            ablativeCharges: hasTechOnSlot(m.slot, 'ablativeArmor') ? 3 : 0, // Ablative Armor: first 3 hits reduced
+            emergencyUsed: false, // Emergency Rebuild: once per fight
+          };
         }
       });
     }
@@ -291,6 +321,8 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     if (playerEntangled && playerEntangled.turnsRemaining > 0) cost += 1;
     // Quick-Release tech: -1 cost for moves from teched slot
     if (move.fromSlot && hasTechOnSlot(move.fromSlot, 'costReduction')) cost = Math.max(1, cost - 1);
+    // Voltamander Overcharged (7+): -1 cost
+    if (playerCharKey === 'voltamander' && voltCharge >= 7) cost = Math.max(1, cost - 1);
     return cost;
   }
 
@@ -688,15 +720,16 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       let base = move.baseDamage;
       if (isVariableDmg) base = compDmgTotal;
 
-      const atkMod = (attackerStats?.attack || 50) / 50;
+      // POWER/FINISHER use Attack stat, PSYCHIC uses Willpower stat
+      const channel = move.channel || 'POWER';
+      const atkStat = channel === 'PSYCHIC' ? (attackerStats?.willpower || 50) : (attackerStats?.attack || 50);
+      const atkMod = atkStat / 50;
       const ePush = effectivePush(push);
       let raw = isVariableDmg ? base : base * ePush * atkMod;
 
-      // Channel-based defensive reduction
-      const channel = move.channel || 'POWER';
+      // POWER/FINISHER reduced by Defense, PSYCHIC reduced by Willpower
       let defStat = defenderStats?.defense || 50;
       if (channel === 'PSYCHIC') defStat = defenderStats?.willpower || 50;
-      if (channel === 'FINISHER') defStat = defenderStats?.defense || 50; // finishers still reduced by defense
       const reduced = raw * (50 / Math.max(1, defStat));
 
       const matchMult = wonMatchup ? 1 : 0.5;
@@ -899,6 +932,19 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       baseDmg = applyScarEffects(scars, baseDmg, pMove.moveType, true);
       // Plasma Coating tech: +1 base damage for moves from teched slot
       if (pMove.fromSlot && hasTechOnSlot(pMove.fromSlot, 'bonusDamage')) baseDmg += 1;
+      // Berserker Cortex mutation: +1 base when composure below 50%
+      if (pRes.composure < MAX_COMPOSURE * 0.5 && mutations?.some(m => m.effect === 'berserkerCortex')) baseDmg += 1;
+      // Psionic Amplifier mutation: +1 base to PSYCHIC moves
+      if (pMove.channel === 'PSYCHIC' && mutations?.some(m => m.effect === 'psionicAmplifier')) baseDmg += 1;
+      // Flow Bonus: +1 base when using different type than last turn
+      const playerHasFlow = playerLastType !== null && pMove.moveType !== playerLastType;
+      if (playerHasFlow || pMove.isFinisher) { baseDmg += 1; log.push('Flow bonus! +1 base damage'); }
+
+      // Voltamander Charge bonus (player)
+      if (playerCharKey === 'voltamander' && voltCharge >= 4) {
+        baseDmg += voltCharge >= 7 ? 2 : 1;
+        log.push(`Bioelectric Charge: +${voltCharge >= 7 ? 2 : 1} damage (${voltCharge >= 7 ? 'Overcharged' : 'Charged'})`);
+      }
 
       // Scar: composure bonus
       const compBonus = getScarCompBonus(scars);
@@ -1002,8 +1048,31 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
         log.push(`${pMove.name}: +${regenAmt} Guard`);
       }
 
-      // Deduct player stamina
-      newPRes.stamina -= pPush;
+      // Deduct player stamina (EVASION gets -1 cost discount)
+      const pEffectivePush = pMove.moveType === 'evasion' ? Math.max(0, pPush - 1) : pPush;
+      newPRes.stamina -= pEffectivePush;
+
+      // Stamina interactions per move type
+      if (pMove.moveType === 'fast' && pWon) {
+        newPRes.stamina = Math.min(STAMINA_CAP, newPRes.stamina + 1);
+        log.push('FAST refund: +1 stamina');
+      }
+      if (pMove.moveType === 'grab' && pWon) {
+        newPRes.stamina = Math.min(STAMINA_CAP, newPRes.stamina + 1);
+        newORes.stamina = Math.max(0, newORes.stamina - 1);
+        log.push('GRAB steal: +1 stamina, opponent -1');
+      }
+      if (pMove.moveType === 'psychic' && pWon) {
+        setOppRegenDebuff(1);
+        log.push('PSYCHIC: opponent regen -1 next turn');
+      }
+      if (pMove.moveType === 'defense') {
+        setPlayerRegenBonus(1);
+        log.push('DEFENSE: +1 regen next turn');
+      }
+
+      // Update last move type for Flow tracking
+      setPlayerLastType(pMove.moveType);
 
       // Gorilla Momentum tracking (POWER channel = Guard hits)
       if (playerCharKey === 'cyberGorilla') {
@@ -1011,9 +1080,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
           newMomentum++;
           log.push(`Momentum: ${newMomentum}`);
         } else {
-          if (!hasTechEffect('momentumPersist') || pMove.channel === 'SELF') {
-            newMomentum = 0;
-          }
+          newMomentum = 0;
         }
       }
     }
@@ -1026,6 +1093,19 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       } else {
 
       let dmg = calcDamage(oMove, oPush, oStats, pStats, oWon, oMove.variableDamage, MAX_COMPOSURE - newPRes.composure);
+
+      // Glass Viper stealth bonus: +50% damage from stealth
+      if (opponentCharKey === 'glassViper' && viperStealth && oMove.moveType !== 'defense') {
+        dmg = Math.floor(dmg * 1.5);
+        log.push('STEALTH STRIKE: +50% damage!');
+      }
+
+      // Voltamander Charge bonus (opponent)
+      if (opponentCharKey === 'voltamander' && voltCharge >= 4) {
+        const bonus = voltCharge >= 7 ? 2 : 1;
+        dmg += bonus;
+        log.push(`Bioelectric Charge: +${bonus} damage`);
+      }
 
       // Scar: damage reduction
       const scarReduction = getScarDamageReduction(scars);
@@ -1161,11 +1241,33 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
         log.push(`${oMove.name}: opponent +${regenAmt} Guard`);
       }
 
-      // Deduct AI stamina
-      newORes.stamina -= oPush;
+      // Deduct AI stamina (EVASION gets -1 discount)
+      const oEffectivePush = oMove.moveType === 'evasion' ? Math.max(0, oPush - 1) : oPush;
+      newORes.stamina -= oEffectivePush;
 
-      // Turtle Stamina Tax passive (player is turtle) — Tax Collector tech lowers threshold to 2+
-      const taxThreshold = hasTechEffect('taxLower') ? 2 : 3;
+      // AI stamina interactions
+      if (oMove.moveType === 'fast' && oWon) {
+        newORes.stamina = Math.min(STAMINA_CAP, newORes.stamina + 1);
+        log.push('Opponent FAST refund: +1 stamina');
+      }
+      if (oMove.moveType === 'grab' && oWon) {
+        newORes.stamina = Math.min(STAMINA_CAP, newORes.stamina + 1);
+        newPRes.stamina = Math.max(0, newPRes.stamina - 1);
+        log.push('Opponent GRAB steal: +1 stamina, you -1');
+      }
+      if (oMove.moveType === 'psychic' && oWon) {
+        setPlayerRegenDebuff(1);
+        log.push('Opponent PSYCHIC: your regen -1 next turn');
+      }
+      if (oMove.moveType === 'defense') {
+        setOppRegenBonus(1);
+      }
+
+      // AI flow bonus (applied in damage calc above via oppLastType)
+      setOppLastType(oMove.moveType);
+
+      // Turtle Stamina Tax passive
+      const taxThreshold = 3;
       if (playerCharKey === 'terrorPinTurtle' && oPush >= taxThreshold) {
         newORes.stamina -= 1;
         log.push('Stamina Tax: -1 extra stamina');
@@ -1206,11 +1308,16 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     if (newPRes.guard <= 0 && pRes.guard > 0) playSound('resourceBreak');
     if (newPRes.composure <= 0 && pRes.composure > 0) playSound('resourceBreak');
 
-    // Stamina regen
-    const pRegenRate = newPRes.stamina < 3 ? 1 : STAMINA_REGEN;
-    const oRegenRate = newORes.stamina < 3 ? 1 : STAMINA_REGEN;
+    // Stamina regen (with DEFENSE bonus / PSYCHIC debuff applied)
+    const pBaseRegen = newPRes.stamina < 3 ? 1 : STAMINA_REGEN;
+    const oBaseRegen = newORes.stamina < 3 ? 1 : STAMINA_REGEN;
+    const pRegenRate = Math.max(0, pBaseRegen + playerRegenBonus - playerRegenDebuff);
+    const oRegenRate = Math.max(0, oBaseRegen + oppRegenBonus - oppRegenDebuff);
     newPRes.stamina = clamp(newPRes.stamina + pRegenRate, 0, STAMINA_CAP);
     newORes.stamina = clamp(newORes.stamina + oRegenRate, 0, STAMINA_CAP);
+    // Reset regen modifiers after application
+    setPlayerRegenBonus(0); setOppRegenBonus(0);
+    setPlayerRegenDebuff(0); setOppRegenDebuff(0);
 
     // Passive shield regen: +1 Guard and +1 Composure per turn (if not broken)
     if (newPRes.guard > 0 && newPRes.guard < MAX_GUARD) {
@@ -1228,7 +1335,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
     // Bee Residual Sting passive (Sting Synthesizer tech: 2 instead of 1)
     if (playerCharKey === 'beeSwarm') {
-      const stingDmg = hasTechEffect('stingBoost') ? 2 : 1;
+      const stingDmg = 1;
       newORes.body = Math.max(0, newORes.body - stingDmg);
       log.push(`Residual Sting: ${stingDmg} Body to opponent`);
       playSound('passive');
@@ -1245,11 +1352,60 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       log.push('Regenerative Tissue: +1 Body');
     }
 
-    // Auto-Repair Nanites tech: +1 mutation HP per turn for teched slots
-    activeTech.filter(t => t.effect === 'mutationRegen').forEach(t => {
-      const mut = Object.values(newMutHP).find(m => m.slot === t.slot && m.currentHP > 0 && m.currentHP < m.maxHP);
-      if (mut) { mut.currentHP = Math.min(mut.maxHP, mut.currentHP + 1); log.push(`Auto-Repair: +1 HP to ${mut.mutation.name}`); }
+    // Emergency Rebuild tech: when mutation drops below 30% HP, restore 5 (once/fight)
+    Object.values(newMutHP).forEach(mut => {
+      if (mut.currentHP > 0 && mut.currentHP <= mut.maxHP * 0.3 && !mut.emergencyUsed && hasTechOnSlot(mut.slot, 'emergencyRebuild')) {
+        mut.currentHP = Math.min(mut.maxHP, mut.currentHP + 5);
+        mut.emergencyUsed = true;
+        log.push(`Emergency Rebuild: ${mut.mutation.name} restored to ${mut.currentHP} HP!`);
+      }
     });
+
+    // Endurance Core tech: restore 3 to most damaged resource on turns 10 and 15
+    if (hasTechEffect('enduranceCore') && (turn === 10 || turn === 15)) {
+      const resources = [
+        { key: 'guard', val: newPRes.guard, max: MAX_GUARD },
+        { key: 'composure', val: newPRes.composure, max: MAX_COMPOSURE },
+        { key: 'body', val: newPRes.body, max: MAX_BODY },
+      ];
+      const mostDamaged = resources.reduce((a, b) => (b.max - b.val) > (a.max - a.val) ? b : a);
+      if (mostDamaged.max - mostDamaged.val > 0) {
+        const heal = Math.min(3, mostDamaged.max - mostDamaged.val);
+        newPRes[mostDamaged.key] += heal;
+        log.push(`Endurance Core: +${heal} ${mostDamaged.key} (turn ${turn} heal)`);
+      }
+    }
+
+    // Fortress Protocol mutation: DEFENSE moves also restore 1 Composure
+    if (pMove && pMove.moveType === 'defense' && mutations?.some(m => m.effect === 'fortressProtocol')) {
+      newPRes.composure = Math.min(MAX_COMPOSURE, newPRes.composure + 1);
+      log.push('Fortress Protocol: +1 Composure (defense move)');
+    }
+
+    // Deep Roots mutation: +1 stamina regen, +2 if below 30% in any resource
+    if (mutations?.some(m => m.effect === 'deepRoots')) {
+      const lowResource = newPRes.guard < MAX_GUARD * 0.3 || newPRes.composure < MAX_COMPOSURE * 0.3 || newPRes.body < MAX_BODY * 0.3;
+      const deepRootsBonus = lowResource ? 2 : 1;
+      newPRes.stamina = Math.min(STAMINA_CAP, newPRes.stamina + deepRootsBonus);
+      log.push(`Deep Roots: +${deepRootsBonus} stamina`);
+    }
+
+    // Parasitic Drain mutation: on hit, drain 1 from opponent's most damaged mutation, heal 1 on yours
+    if (pMove && pPush > 0 && pWon && mutations?.some(m => m.effect === 'parasiticDrain')) {
+      const oppAlive = Object.values(newOppMutHP).filter(m => m.currentHP > 0);
+      const myDamaged = Object.values(newMutHP).filter(m => m.currentHP > 0 && m.currentHP < m.maxHP);
+      if (oppAlive.length > 0) {
+        const target = oppAlive.reduce((a, b) => a.currentHP < b.currentHP ? a : b);
+        target.currentHP = Math.max(0, target.currentHP - 1);
+        log.push(`Parasitic Drain: -1 from ${target.mutation.name}`);
+        if (target.currentHP <= 0) { oppMutationsDestroyedThisTurn.push(target.mutation); log.push(`MUTATION DESTROYED: ${target.mutation.name}!`); }
+      }
+      if (myDamaged.length > 0) {
+        const heal = myDamaged.reduce((a, b) => a.currentHP < b.currentHP ? a : b);
+        heal.currentHP = Math.min(heal.maxHP, heal.currentHP + 1);
+        log.push(`Parasitic Drain: +1 to ${heal.mutation.name}`);
+      }
+    }
 
     // Shock Plating tech: if opponent hit a teched mutation this turn, deal 1 Body back
     if (oMove && oPush > 0 && aiTargetMutation) {
@@ -1260,11 +1416,27 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       }
     }
 
-    // Neural Scrambler tech: on player hit, chip 1 Composure
-    if (pMove && pPush > 0 && pWon && pMove.fromSlot && hasTechOnSlot(pMove.fromSlot, 'chipComposure')) {
-      newORes.composure = Math.max(0, newORes.composure - 1);
-      log.push('Neural Scrambler: +1 Composure chip');
+    // Neural Overload tech: on hit, 30% chance opponent next move costs +1
+    if (pMove && pPush > 0 && pWon && pMove.fromSlot && hasTechOnSlot(pMove.fromSlot, 'neuralOverload')) {
+      if (Math.random() < 0.3) {
+        newAiCostMod += 1;
+        log.push('Neural Overload: opponent next move costs +1 stamina!');
+      }
     }
+
+    // Reflex Amplifier tech: lose matchup → gain +2 stamina
+    if (!pWon && hasTechEffect('reflexAmplifier')) {
+      newPRes.stamina = Math.min(STAMINA_CAP, newPRes.stamina + 2);
+      log.push('Reflex Amplifier: +2 stamina (lost matchup)');
+    }
+
+    // Adrenaline Regulator tech: win matchup → next push costs 1 less
+    if (pWon && hasTechEffect('adrenalineRegulator')) {
+      newCostMod -= 1;
+      log.push('Adrenaline Regulator: next push costs -1');
+    }
+
+    // Siege Protocol tech: +2 to mutation damage, -1 to resource damage (applied in damage routing above)
 
     // Venom Injector tech: on player hit, apply DoT
     if (pMove && pPush > 0 && pWon && pMove.fromSlot && hasTechOnSlot(pMove.fromSlot, 'venomDot')) {
@@ -1289,6 +1461,185 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     }
 
     // === COUNTER-MECHANIC PASSIVES ===
+
+    // ── Iron Mantis — Vice Grip ──
+    // On GRAB win, clamp opponent's target mutation for 2 turns
+    if (opponentCharKey === 'ironMantis' && oMove?.moveType === 'grab' && oWon) {
+      // Clamp player's most damaged mutation (or random alive one)
+      const playerAlive = Object.entries(newMutHP).filter(([, v]) => v.currentHP > 0);
+      if (playerAlive.length > 0) {
+        const [targetId, targetMut] = playerAlive.reduce((a, b) => a[1].currentHP < b[1].currentHP ? a : b);
+        setClampedMutations(prev => ({ ...prev, [targetId]: 2 }));
+        log.push(`VICE GRIP: ${targetMut.mutation.name} clamped for 2 turns!`);
+      }
+    }
+    if (playerCharKey === 'ironMantis' && pMove?.moveType === 'grab' && pWon) {
+      const oppAlive = Object.entries(newOppMutHP).filter(([, v]) => v.currentHP > 0);
+      if (oppAlive.length > 0) {
+        const [targetId, targetMut] = oppAlive.reduce((a, b) => a[1].currentHP < b[1].currentHP ? a : b);
+        log.push(`VICE GRIP: ${targetMut.mutation.name} clamped for 2 turns!`);
+        // Clamped opponent mutations lose 1 HP/turn (tracked below)
+      }
+    }
+    // Clamp tick: clamped mutations lose 1 HP/turn, decrement timer
+    if (Object.keys(clampedMutations).length > 0) {
+      const newClamped = {};
+      for (const [mutId, turnsLeft] of Object.entries(clampedMutations)) {
+        if (newMutHP[mutId] && newMutHP[mutId].currentHP > 0) {
+          newMutHP[mutId].currentHP = Math.max(0, newMutHP[mutId].currentHP - 1);
+          log.push(`Vice Grip: ${newMutHP[mutId].mutation.name} -1 HP (clamped)`);
+          if (newMutHP[mutId].currentHP <= 0) {
+            mutationsDestroyedThisTurn.push(newMutHP[mutId].mutation);
+            log.push(`MUTATION DESTROYED: ${newMutHP[mutId].mutation.name}!`);
+          }
+        }
+        if (turnsLeft > 1) newClamped[mutId] = turnsLeft - 1;
+      }
+      setClampedMutations(newClamped);
+    }
+
+    // ── Voltamander — Bioelectric Charge ──
+    if (opponentCharKey === 'voltamander' || playerCharKey === 'voltamander') {
+      const isPlayer = playerCharKey === 'voltamander';
+      const didAct = isPlayer ? (pMove && pPush > 0) : (oMove && oPush > 0);
+      if (didAct) {
+        const move = isPlayer ? pMove : oMove;
+        const chargeGain = move?.effect === 'doubleCharge' ? 2 : 1;
+        const newCharge = Math.min(10, voltCharge + chargeGain);
+
+        if (newCharge >= 10) {
+          // AoE discharge: 4 to all opponent resources
+          if (isPlayer) {
+            newORes.guard = Math.max(0, newORes.guard - 4);
+            newORes.composure = Math.max(0, newORes.composure - 4);
+            newORes.body = Math.max(0, newORes.body - 4);
+            log.push('BIOELECTRIC DISCHARGE! 4 damage to ALL opponent resources! Charge reset.');
+          } else {
+            newPRes.guard = Math.max(0, newPRes.guard - 4);
+            newPRes.composure = Math.max(0, newPRes.composure - 4);
+            newPRes.body = Math.max(0, newPRes.body - 4);
+            log.push('BIOELECTRIC DISCHARGE! 4 damage to ALL your resources!');
+          }
+          setVoltCharge(0);
+        } else {
+          setVoltCharge(newCharge);
+          if (newCharge === 4) log.push('Bioelectric Charge: CHARGED (4+) — +15% Attack');
+          else if (newCharge === 7) log.push('Bioelectric Charge: OVERCHARGED (7+) — +30% Attack, -1 cost');
+          else log.push(`Bioelectric Charge: ${newCharge}/10`);
+        }
+      }
+    }
+
+    // ── Mycelith — Sporulation ──
+    if (opponentCharKey === 'mycelith') {
+      // Spawn 1 construct end of turn (max 3)
+      const currentConstructs = [...sporeConstructs].filter(c => c.hp > 0);
+      if (currentConstructs.length < 3) {
+        const newId = `spore_${turn}`;
+        currentConstructs.push({ id: newId, hp: 4, maxHp: 4 });
+        log.push(`Sporulation: Spore Construct spawned (${currentConstructs.length}/3)`);
+      }
+      // Each living construct deals 1 Body chip to player
+      let sporeChip = 0;
+      currentConstructs.forEach(c => { if (c.hp > 0) sporeChip++; });
+      if (sporeChip > 0) {
+        newPRes.body = Math.max(0, newPRes.body - sporeChip);
+        log.push(`Spore Constructs: ${sporeChip} Body damage (${currentConstructs.filter(c => c.hp > 0).length} active)`);
+      }
+      // AREA attacks hit all constructs
+      if (pMove && pWon && pMove.channel === 'AREA') {
+        const areaDmg = Math.floor((pMove.baseDamage || 3) * 0.5);
+        currentConstructs.forEach(c => {
+          if (c.hp > 0) {
+            c.hp = Math.max(0, c.hp - areaDmg);
+            if (c.hp <= 0) log.push(`Spore Construct destroyed by AREA attack!`);
+          }
+        });
+      }
+      setSporeConstructs(currentConstructs.filter(c => c.hp > 0));
+    }
+    if (playerCharKey === 'mycelith') {
+      // Player Mycelith spawns constructs that chip opponent
+      // (simplified: same logic but damages opponent)
+      const currentConstructs = [...sporeConstructs].filter(c => c.hp > 0);
+      if (currentConstructs.length < 3) {
+        currentConstructs.push({ id: `spore_${turn}`, hp: 4, maxHp: 4 });
+        log.push(`Sporulation: Spore Construct spawned (${currentConstructs.length}/3)`);
+      }
+      let sporeChip = 0;
+      currentConstructs.forEach(c => { if (c.hp > 0) sporeChip++; });
+      if (sporeChip > 0) {
+        newORes.body = Math.max(0, newORes.body - sporeChip);
+        log.push(`Spore Constructs: ${sporeChip} Body to opponent`);
+      }
+      if (oMove && oWon && oMove.channel === 'AREA') {
+        const areaDmg = Math.floor((oMove.baseDamage || 3) * 0.5);
+        currentConstructs.forEach(c => {
+          if (c.hp > 0) {
+            c.hp = Math.max(0, c.hp - areaDmg);
+            if (c.hp <= 0) log.push(`Your Spore Construct destroyed!`);
+          }
+        });
+      }
+      setSporeConstructs(currentConstructs.filter(c => c.hp > 0));
+    }
+
+    // ── Glass Viper — Stealth Strike ──
+    if (opponentCharKey === 'glassViper') {
+      // After attacking, become visible for 2 turns
+      if (oMove && oPush > 0 && viperStealth) {
+        setViperStealth(false);
+        setViperVisibleTurns(2);
+        log.push('Glass Viper revealed! Visible for 2 turns.');
+      }
+      // Re-stealth via Fade move
+      if (oMove?.effect === 'restealth') {
+        setViperStealth(true);
+        setViperVisibleTurns(0);
+        log.push('Glass Viper fades into stealth!');
+      }
+      // Visibility timer tick
+      if (viperVisibleTurns > 0) {
+        const newVisible = viperVisibleTurns - 1;
+        setViperVisibleTurns(newVisible);
+        if (newVisible <= 0) {
+          setViperStealth(true);
+          log.push('Glass Viper re-enters stealth.');
+        }
+      }
+    }
+
+    // ── Bone Hydra — Regrowth (3 heads) ──
+    if (opponentCharKey === 'boneHydra' && hydraHeads.length > 0) {
+      const newHeads = hydraHeads.map(h => ({ ...h }));
+      // Regen timer: dead heads regenerate after 3 turns
+      newHeads.forEach((head, i) => {
+        if (!head.alive) {
+          head.regenTimer--;
+          if (head.regenTimer <= 0) {
+            head.hp = head.maxHp;
+            head.alive = true;
+            head.regenTimer = 0;
+            log.push(`Bone Hydra: Head ${i + 1} regenerated at full HP!`);
+          }
+        }
+      });
+      // Player can target heads — damage dealt to Bone Hydra goes to targeted head
+      if (pMove && pPush > 0 && pWon && selectedTarget?.startsWith?.('hydra_head_')) {
+        const headIdx = parseInt(selectedTarget.split('_').pop());
+        if (newHeads[headIdx] && newHeads[headIdx].alive) {
+          const headDmg = Math.min(newHeads[headIdx].hp, pMove.baseDamage || 3);
+          newHeads[headIdx].hp -= headDmg;
+          log.push(`Hit Hydra Head ${headIdx + 1}: -${headDmg} HP (${newHeads[headIdx].hp}/${newHeads[headIdx].maxHp})`);
+          if (newHeads[headIdx].hp <= 0) {
+            newHeads[headIdx].alive = false;
+            newHeads[headIdx].regenTimer = 3;
+            log.push(`HEAD ${headIdx + 1} DESTROYED! Move disabled. Regrows in 3 turns.`);
+          }
+        }
+      }
+      setHydraHeads(newHeads);
+    }
 
     // Hydravine Regrowth: regen 2 on most damaged resource/mutation
     if (opponentCharKey === 'hydravine') {
@@ -1533,6 +1884,18 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
   if (playerEntangled && playerEntangled.turnsRemaining > 0) {
     aliveMoves = aliveMoves.filter(m => m.moveType !== 'evasion');
   }
+  // Null Worm — Null Field: strip tech-enhanced moves, revert to base moves
+  if (opponentCharKey === 'nullWorm') {
+    aliveMoves = aliveMoves.filter(m => !m.fromTech);
+  }
+  // Vice Grip — clamped mutations can't use their moves
+  if (Object.keys(clampedMutations).length > 0) {
+    aliveMoves = aliveMoves.filter(m => !m.fromMutation || !clampedMutations[m.fromMutation]);
+  }
+  // Bone Hydra — disable moves from destroyed heads
+  if (opponentCharKey === 'boneHydra' && hydraHeads.length > 0) {
+    // Bone Hydra's dead heads disable its own moves (handled in AI move selection)
+  }
   // Add ghost move from Spore Cloud (disappears after 1 turn)
   if (ghostMove) aliveMoves = [...aliveMoves, ghostMove];
   const visibleMoves = isTutorial ? filterMovesForTutorial(aliveMoves, tutorialPhase) : aliveMoves;
@@ -1645,8 +2008,13 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
     [PHASE.FIGHT_OVER]: fightResult?.reason || 'Fight Over',
   };
 
-  // Shared overlay style for glass panels
-  const glassPanel = { background: 'rgba(5,10,20,0.75)', backdropFilter: 'blur(4px)', border: '1px solid rgba(0,204,255,0.15)', borderRadius: 4 };
+  // Shared overlay style for glass panels — angled aesthetic
+  const glassPanel = {
+    background: 'linear-gradient(160deg, rgba(5,10,25,0.85) 0%, rgba(3,6,15,0.9) 100%)',
+    backdropFilter: 'blur(6px)',
+    border: '1px solid rgba(0,204,255,0.1)',
+    borderTop: '1px solid rgba(0,204,255,0.2)',
+  };
 
   return (
     <div
@@ -1670,7 +2038,11 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       {/* ═══ HUD OVERLAYS (layer 1) ═══ */}
 
       {/* Top bar — names + turn counter */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', ...glassPanel, borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none', zIndex: 10 }}>
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '10px 20px', ...glassPanel, borderTop: 'none', borderLeft: 'none', borderRight: 'none', zIndex: 10,
+        clipPath: 'polygon(0% 0%, 100% 0%, 98% 100%, 2% 100%)',
+      }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: playerChar.color, fontFamily: 'var(--font-display)' }}>{playerChar.name}</div>
           <div style={{ fontSize: 9, fontWeight: 600, color: playerChar.color, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.7 }}>
@@ -1718,7 +2090,13 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       )}
 
       {/* Player resources — left side overlay */}
-      <div style={{ position: 'absolute', top: 56, left: 8, width: 140, padding: 8, ...glassPanel, zIndex: 10 }}>
+      <div style={{
+        position: 'absolute', top: 56, left: 8, width: 148, padding: '10px 10px 8px',
+        background: 'rgba(5,10,25,0.85)', backdropFilter: 'blur(6px)',
+        borderLeft: `2px solid ${playerChar.color}88`, borderRight: '1px solid rgba(0,204,255,0.08)',
+        borderTop: '1px solid rgba(0,204,255,0.08)', borderBottom: '1px solid rgba(0,204,255,0.08)',
+        borderRadius: '0 4px 4px 0', zIndex: 10,
+      }}>
         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, color: playerChar.color, textTransform: 'uppercase', letterSpacing: 1 }}>YOU</div>
         {(tutorialPhase !== TUTORIAL_PHASES.BODY_ONLY) && (
           <ResourceBar label="Guard" value={pRes.guard} max={MAX_GUARD} color="var(--guard)" change={pResChanges.guard} />
@@ -1765,7 +2143,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       </div>
 
       {/* Active buffs/debuffs display */}
-      {(damageShield > 0 || guaranteeWin || flashBlind || scrambleActive > 0 || revealTurns > 0 || adrenalineActive || playerEntangled || playerDots.length > 0 || echoCamoTurns > 0) && (
+      {(damageShield > 0 || guaranteeWin || flashBlind || scrambleActive > 0 || revealTurns > 0 || adrenalineActive || playerEntangled || playerDots.length > 0 || echoCamoTurns > 0 || Object.keys(clampedMutations).length > 0 || voltCharge > 0 || sporeConstructs.length > 0 || viperStealth || hydraHeads.some(h => !h.alive)) && (
         <div style={{ position: 'absolute', bottom: 230, left: 8, maxWidth: 140, padding: 8, ...glassPanel, zIndex: 10 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {damageShield > 0 && (
@@ -1813,12 +2191,43 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                 ☠ VENOM ×{playerDots.reduce((sum, dot) => sum + dot.damage, 0)}
               </div>
             )}
+            {Object.keys(clampedMutations).length > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(255, 100, 0, 0.2)', borderLeft: '3px solid #ff6400', color: '#ff8844', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(255, 100, 0, 0.4)' }}>
+                CLAMPED ×{Object.keys(clampedMutations).length}
+              </div>
+            )}
+            {voltCharge > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: voltCharge >= 7 ? 'rgba(0, 229, 255, 0.3)' : voltCharge >= 4 ? 'rgba(0, 229, 255, 0.2)' : 'rgba(0, 229, 255, 0.1)', borderLeft: `3px solid ${voltCharge >= 7 ? '#00e5ff' : voltCharge >= 4 ? '#00bbdd' : '#006688'}`, color: voltCharge >= 7 ? '#00e5ff' : voltCharge >= 4 ? '#00bbdd' : '#006688', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: `0 0 8px rgba(0, 229, 255, ${voltCharge >= 7 ? 0.6 : 0.3})` }}>
+                CHARGE {voltCharge}/10{voltCharge >= 7 ? ' OVER' : voltCharge >= 4 ? ' CHG' : ''}
+              </div>
+            )}
+            {sporeConstructs.length > 0 && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(102, 255, 102, 0.2)', borderLeft: '3px solid #66ff66', color: '#66ff66', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(102, 255, 102, 0.4)' }}>
+                SPORES ×{sporeConstructs.length} ({sporeConstructs.reduce((s, c) => s + c.hp, 0)}HP)
+              </div>
+            )}
+            {viperStealth && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(0, 255, 68, 0.15)', borderLeft: '3px solid #00ff44', color: '#00ff44', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(0, 255, 68, 0.4)' }}>
+                STEALTH (+50% DMG)
+              </div>
+            )}
+            {hydraHeads.some(h => !h.alive) && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '4px 6px', backgroundColor: 'rgba(136, 26, 26, 0.2)', borderLeft: '3px solid #881a1a', color: '#cc4444', textTransform: 'uppercase', letterSpacing: 0.5, textShadow: '0 0 8px rgba(136, 26, 26, 0.4)' }}>
+                HEADS {hydraHeads.filter(h => h.alive).length}/3
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Opponent resources — right side overlay */}
-      <div style={{ position: 'absolute', top: 56, right: 8, width: 140, padding: 8, ...glassPanel, zIndex: 10 }}>
+      <div style={{
+        position: 'absolute', top: 56, right: 8, width: 148, padding: '10px 10px 8px',
+        background: 'rgba(5,10,25,0.85)', backdropFilter: 'blur(6px)',
+        borderRight: `2px solid ${oppChar.color}88`, borderLeft: '1px solid rgba(0,204,255,0.08)',
+        borderTop: '1px solid rgba(0,204,255,0.08)', borderBottom: '1px solid rgba(0,204,255,0.08)',
+        borderRadius: '4px 0 0 4px', zIndex: 10,
+      }}>
         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, color: oppChar.color, textTransform: 'uppercase', letterSpacing: 1 }}>OPPONENT</div>
         {(tutorialPhase !== TUTORIAL_PHASES.BODY_ONLY) && (
           <ResourceBar label="Guard" value={oRes.guard} max={MAX_GUARD} color="var(--guard)" change={oResChanges.guard} />
@@ -1848,6 +2257,39 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
           </div>
         )}
       </div>
+
+      {/* Opponent passive status — below opponent resources */}
+      {(viperStealth || voltCharge > 0 || sporeConstructs.length > 0 || hydraHeads.length > 0 || oppDots.length > 0) && (
+        <div style={{ position: 'absolute', top: 220, right: 8, maxWidth: 140, padding: 6, background: 'rgba(5,10,25,0.75)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 4, zIndex: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {opponentCharKey === 'glassViper' && viperStealth && (
+              <div style={{ fontSize: 7, fontWeight: 700, padding: '3px 5px', backgroundColor: 'rgba(0, 255, 68, 0.15)', borderLeft: '2px solid #00ff44', color: '#00ff44', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                STEALTH
+              </div>
+            )}
+            {opponentCharKey === 'voltamander' && voltCharge > 0 && (
+              <div style={{ fontSize: 7, fontWeight: 700, padding: '3px 5px', backgroundColor: 'rgba(0, 229, 255, 0.15)', borderLeft: `2px solid ${voltCharge >= 7 ? '#00e5ff' : '#006688'}`, color: voltCharge >= 7 ? '#00e5ff' : '#00bbdd', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                CHARGE {voltCharge}/10
+              </div>
+            )}
+            {opponentCharKey === 'mycelith' && sporeConstructs.length > 0 && (
+              <div style={{ fontSize: 7, fontWeight: 700, padding: '3px 5px', backgroundColor: 'rgba(102, 255, 102, 0.15)', borderLeft: '2px solid #66ff66', color: '#66ff66', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                SPORES ×{sporeConstructs.length}
+              </div>
+            )}
+            {opponentCharKey === 'boneHydra' && hydraHeads.length > 0 && (
+              <div style={{ fontSize: 7, fontWeight: 700, padding: '3px 5px', backgroundColor: 'rgba(136, 26, 26, 0.15)', borderLeft: '2px solid #881a1a', color: '#cc4444', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                HEADS: {hydraHeads.map((h, i) => h.alive ? `[${h.hp}]` : '[X]').join(' ')}
+              </div>
+            )}
+            {oppDots.length > 0 && (
+              <div style={{ fontSize: 7, fontWeight: 700, padding: '3px 5px', backgroundColor: 'rgba(255, 0, 0, 0.15)', borderLeft: '2px solid #ff0000', color: '#ff4444', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                VENOM ×{oppDots.reduce((s, d) => s + d.damage, 0)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ═══ CENTER OVERLAY — reveal area, stamina push, fight result ═══ */}
       <div style={{ position: 'absolute', top: '35%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
@@ -1924,7 +2366,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
         {/* Committed — hidden cards + click to reveal */}
         {phase === PHASE.COMMITTED && (
-          <div style={{ ...glassPanel, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div style={{ ...glassPanel, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, clipPath: 'polygon(12px 0%, calc(100% - 12px) 0%, 100% 100%, 0% 100%)' }}>
             <div style={{ display: 'flex', gap: 40, alignItems: 'center' }}>
               <MoveCard label="YOUR MOVE" name="???" color="var(--text-muted)" />
               <MoveCard label="OPPONENT" name="???" color="var(--text-muted)" />
@@ -1940,7 +2382,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
         {/* Reveal / Push / Resolution cards */}
         {(phase === PHASE.REVEAL || phase === PHASE.STAMINA_PUSH || phase === PHASE.PUSH_REVEAL || phase === PHASE.RESOLUTION) && (
-          <div style={{ ...glassPanel, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div style={{ ...glassPanel, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, clipPath: 'polygon(12px 0%, calc(100% - 12px) 0%, 100% 100%, 0% 100%)' }}>
             <div style={{ display: 'flex', gap: 40, alignItems: 'center' }}>
               <MoveCard
                 label="YOUR MOVE"
@@ -2085,7 +2527,12 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
       {/* ═══ BOTTOM OVERLAY — prev turn log + move list + actions ═══ */}
       {phase === PHASE.MOVE_SELECT && (
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, ...glassPanel, borderRadius: 0, borderBottom: 'none', borderLeft: 'none', borderRight: 'none', padding: '10px 16px', zIndex: 10 }}>
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
+          background: 'linear-gradient(180deg, rgba(5,10,25,0.7) 0%, rgba(5,10,25,0.95) 30%)',
+          backdropFilter: 'blur(8px)', borderTop: '1px solid rgba(0,204,255,0.15)', padding: '12px 20px',
+          clipPath: 'polygon(1% 0%, 99% 0%, 100% 100%, 0% 100%)',
+        }}>
           {/* Previous turn log — collapsed summary */}
           {prevTurnLog.length > 0 && (
             <div style={{ marginBottom: 6, padding: '4px 8px', background: '#0a1220', borderRadius: 3, maxHeight: 48, overflowY: 'auto' }}>
@@ -2113,20 +2560,35 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                   onClick={() => usable && setSelectedMove(isSelected ? null : move)}
                   disabled={!usable}
                   style={{
-                    padding: '8px 12px', minWidth: 110, textAlign: 'center',
-                    background: isSelected ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    border: `1.5px solid ${isSelected ? moveColor : usable ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'}`,
-                    borderRadius: 4, color: usable ? '#fff' : 'rgba(255,255,255,0.3)',
-                    opacity: usable ? 1 : 0.4, cursor: usable ? 'pointer' : 'not-allowed',
+                    padding: '8px 12px', minWidth: 115, textAlign: 'left',
+                    background: isSelected ? `${moveColor}15` : 'rgba(10,18,30,0.8)',
+                    borderLeft: `3px solid ${isSelected ? moveColor : usable ? moveColor + '55' : '#1a2030'}`,
+                    borderTop: `1px solid ${isSelected ? moveColor + '44' : '#1a2838'}`,
+                    borderRight: `1px solid ${isSelected ? moveColor + '44' : '#1a2838'}`,
+                    borderBottom: `1px solid ${isSelected ? moveColor + '44' : '#1a2838'}`,
+                    color: usable ? '#fff' : 'rgba(255,255,255,0.3)',
+                    opacity: usable ? 1 : 0.35, cursor: usable ? 'pointer' : 'not-allowed',
                     transition: 'all 0.15s ease',
+                    boxShadow: isSelected ? `0 0 12px ${moveColor}20` : 'none',
+                    clipPath: 'polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%)',
                   }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? moveColor : usable ? '#fff' : 'rgba(255,255,255,0.3)' }}>
-                    {displayName}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: isSelected ? moveColor : usable ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                      {displayName}
+                    </span>
+                    {/* Flow indicator */}
+                    {usable && playerLastType !== null && move.moveType !== playerLastType && (
+                      <span style={{ fontSize: 7, color: '#00ccff', fontWeight: 800, letterSpacing: 1 }}>FLOW</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 9, color: '#8899aa', marginTop: 2 }}>
                     <span style={{ color: moveColor, fontWeight: 600 }}>{TYPE_LABELS[move.moveType]}</span>
                     {' '}<span style={{ fontFamily: 'var(--font-mono)' }}>{displayCost} stm</span>
+                    {/* Stamina interaction hint */}
+                    {move.moveType === 'fast' && <span style={{ color: '#44ff66', marginLeft: 4, fontSize: 8 }}>Win:+1</span>}
+                    {move.moveType === 'grab' && <span style={{ color: '#44ff66', marginLeft: 4, fontSize: 8 }}>Win:steal</span>}
+                    {move.moveType === 'defense' && <span style={{ color: '#44cc66', marginLeft: 4, fontSize: 8 }}>+1 regen</span>}
                   </div>
                   {/* Beats / Loses hints */}
                   {isSelected && move.keyword && (

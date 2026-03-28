@@ -54,7 +54,7 @@ export default function FightIntro({ playerCharKey, opponentCharKey, fightNumber
         textTransform: 'uppercase',
         opacity: phase >= 1 ? 1 : 0, transition: 'opacity 0.4s ease',
       }}>
-        {isBoss ? 'BOSS FIGHT' : `Fight ${fightNumber} of 4`}
+        {isBoss ? 'BOSS FIGHT' : `Fight ${fightNumber} of 8`}
       </div>
 
       {/* ── Player Side (left) ── */}

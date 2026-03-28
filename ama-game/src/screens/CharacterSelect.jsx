@@ -2,19 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { characters } from '../data/characters';
 import SPRITES from '../data/spriteMap';
 import { hasSavedRun, getSaveInfo, loadRun, clearSave } from '../engine/SaveManager';
+import { UNLOCKABLE_SPECIES } from '../data/constants';
 
 /**
  * CharacterSelect — Cinematic fighter selection screen.
  * Animated card reveals, move preview, stat radar, continue run support.
+ * Supports unlockable species — locked characters show as silhouettes.
  */
 
-const PLAYABLE = ['cyberGorilla', 'psychoSquid', 'beeSwarm', 'terrorPinTurtle'];
+const BASE_PLAYABLE = ['cyberGorilla', 'psychoSquid', 'beeSwarm', 'terrorPinTurtle'];
+const BOSS_SPECIES = ['echomorph', 'hydravine', 'parasitex'];
 
 const ARCHETYPE_LABELS = {
   cyberGorilla: 'HEAVY HITTER',
   psychoSquid: 'MENTALIST',
   beeSwarm: 'ATTRITION',
   terrorPinTurtle: 'FORTRESS',
+  ironMantis: 'GRAPPLER',
+  voltamander: 'ESCALATION',
+  mycelith: 'COLONY',
 };
 
 // Floating particle background
@@ -62,13 +68,22 @@ export default function CharacterSelect({ onSelect, onContinue, meta }) {
   const bestRun = meta?.bestRun || 0;
   const wins = meta?.totalWins || 0;
   const losses = meta?.totalLosses || 0;
+  const unlockedSpecies = meta?.unlockedSpecies || [];
+
+  // Build full playable list: base 4 + unlocked species + locked silhouettes
+  const PLAYABLE = [
+    ...BASE_PLAYABLE,
+    ...UNLOCKABLE_SPECIES.filter(s => unlockedSpecies.includes(s)),
+  ];
+  const LOCKED = UNLOCKABLE_SPECIES.filter(s => !unlockedSpecies.includes(s));
 
   const savedRun = hasSavedRun() ? getSaveInfo() : null;
 
   // Staggered reveal animation
   useEffect(() => {
     const t0 = setTimeout(() => setTitleReady(true), 100);
-    const timers = PLAYABLE.map((_, i) =>
+    const allCards = [...PLAYABLE, ...LOCKED];
+    const timers = allCards.map((_, i) =>
       setTimeout(() => setCardsRevealed(i + 1), 300 + i * 150)
     );
     return () => { clearTimeout(t0); timers.forEach(clearTimeout); };
@@ -165,7 +180,7 @@ export default function CharacterSelect({ onSelect, onContinue, meta }) {
         opacity: titleReady ? 1 : 0, transition: 'opacity 0.4s ease 0.3s',
       }}>
         <span>RUN #{runNum}</span>
-        {bestRun > 0 && <span style={{ color: 'var(--text-secondary)' }}>Best: {bestRun}/4</span>}
+        {bestRun > 0 && <span style={{ color: 'var(--text-secondary)' }}>Best: {bestRun}/8</span>}
         {(meta?.totalRuns || 0) > 0 && (
           <span style={{ color: 'var(--text-secondary)' }}>
             Record: {wins}W - {losses}L
@@ -185,7 +200,7 @@ export default function CharacterSelect({ onSelect, onContinue, meta }) {
               Continue Run
             </div>
             <div style={{ fontSize: 10, color: '#6a8a9a', marginTop: 2 }}>
-              {characters[savedRun.playerCharKey]?.name || savedRun.playerCharKey} — {savedRun.arenasCleared}/4 cleared — {savedRun.mutations} mutations
+              {characters[savedRun.playerCharKey]?.name || savedRun.playerCharKey} — {savedRun.arenasCleared}/8 cleared — {savedRun.mutations} mutations
             </div>
           </div>
           <button onClick={handleContinueRun} style={{
@@ -304,6 +319,240 @@ export default function CharacterSelect({ onSelect, onContinue, meta }) {
                 </div>
               </div>
             </button>
+          );
+        })}
+
+        {/* Locked character cards */}
+        {LOCKED.map((key, idx) => {
+          const c = characters[key];
+          const revealed = (PLAYABLE.length + idx) < cardsRevealed;
+          return (
+            <div
+              key={key}
+              style={{
+                background: '#0a0e14',
+                border: '1px solid #1a2a3a',
+                padding: 0, textAlign: 'left', color: 'var(--text-muted)',
+                transition: 'all 0.3s ease',
+                overflow: 'hidden',
+                opacity: revealed ? 0.6 : 0,
+                transform: revealed ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
+                position: 'relative',
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+                borderBottom: '1px solid #1a2a3a',
+                filter: 'grayscale(1)',
+              }}>
+                <div style={{
+                  width: 48, height: 48, background: '#111',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 24, color: '#333',
+                }}>?</div>
+                <div>
+                  <div style={{
+                    fontSize: 14, fontWeight: 700, color: '#3a4a5a',
+                    textTransform: 'uppercase', letterSpacing: 1,
+                  }}>
+                    {c?.name || '???'}
+                  </div>
+                  <div style={{
+                    fontSize: 9, color: '#2a3a4a', letterSpacing: 1, fontWeight: 600,
+                  }}>
+                    {ARCHETYPE_LABELS[key] || 'UNKNOWN'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px' }}>
+                <div style={{
+                  fontSize: 11, color: '#2a3a4a', lineHeight: 1.4,
+                  fontStyle: 'italic',
+                }}>
+                  Defeat this species in the arena to unlock as playable.
+                </div>
+              </div>
+              {/* Lock overlay */}
+              <div style={{
+                position: 'absolute', top: 8, right: 8,
+                fontSize: 16, color: '#2a3a4a',
+              }}>
+                &#128274;
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Boss Species (unlockable by defeating) ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 12, width: '100%', maxWidth: 880, position: 'relative', zIndex: 1,
+      }}>
+        <div style={{
+          gridColumn: '1 / -1', fontSize: 9, color: 'var(--text-muted)',
+          letterSpacing: 2, textTransform: 'uppercase', marginBottom: -4,
+        }}>
+          // Boss Species
+        </div>
+        {BOSS_SPECIES.map((key) => {
+          const c = characters[key];
+          const isUnlocked = unlockedSpecies.includes(key);
+          const isSel = selected === key;
+          const sprite = SPRITES[key]?.front;
+
+          if (isUnlocked) {
+            return (
+              <button
+                key={key}
+                onClick={() => setSelected(key)}
+                style={{
+                  background: isSel ? '#0a1a2e' : 'var(--bg-card)',
+                  border: `1px solid ${isSel ? c.color : 'var(--border)'}`,
+                  padding: 0, textAlign: 'left', color: 'var(--text-primary)',
+                  transition: 'all 0.3s ease',
+                  overflow: 'hidden',
+                  boxShadow: isSel
+                    ? `0 0 24px ${c.color}22, inset 0 0 30px ${c.color}08`
+                    : 'none',
+                  position: 'relative',
+                }}
+              >
+                {/* UNLOCKED badge */}
+                <div style={{
+                  position: 'absolute', top: 6, right: 8,
+                  fontSize: 8, fontWeight: 700, color: '#22c55e',
+                  letterSpacing: 1, textTransform: 'uppercase',
+                  background: '#22c55e18', padding: '2px 6px',
+                  border: '1px solid #22c55e40',
+                }}>
+                  UNLOCKED
+                </div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+                  borderBottom: `1px solid ${isSel ? c.color + '44' : 'var(--border)'}`,
+                  background: isSel ? `${c.color}08` : 'transparent',
+                  transition: 'all 0.2s',
+                }}>
+                  {sprite && (
+                    <img src={sprite} alt={c.name} style={{
+                      width: 48, height: 48, imageRendering: 'pixelated',
+                      objectFit: 'contain',
+                      filter: isSel ? `drop-shadow(0 0 8px ${c.color}60)` : 'brightness(0.6)',
+                      transition: 'all 0.3s',
+                      transform: isSel ? 'scale(1.1)' : 'scale(1)',
+                    }} />
+                  )}
+                  <div>
+                    <div style={{
+                      fontSize: 14, fontWeight: 700,
+                      color: isSel ? c.color : 'var(--text-secondary)',
+                      textTransform: 'uppercase', letterSpacing: 1, transition: 'color 0.2s',
+                    }}>
+                      {c.name}
+                    </div>
+                    <div style={{
+                      fontSize: 9, color: isSel ? `${c.color}aa` : 'var(--text-muted)',
+                      letterSpacing: 1, fontWeight: 600, transition: 'color 0.2s',
+                    }}>
+                      {ARCHETYPE_LABELS[key] || 'BOSS'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, marginBottom: 8 }}>
+                    {c.description}
+                  </div>
+                  <div style={{
+                    fontSize: 10, color: 'var(--text-muted)',
+                    borderTop: '1px solid var(--border)', paddingTop: 8,
+                  }}>
+                    <div style={{ marginBottom: 3 }}>
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Passive:</span> {c.passive.name}
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Kill:</span> {c.killCondition}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    {[
+                      { label: 'ATK', val: c.stats?.attack || 50, color: '#ee6644' },
+                      { label: 'DEF', val: c.stats?.defense || 50, color: '#4488cc' },
+                      { label: 'WIL', val: c.stats?.willpower || 50, color: '#aa66ee' },
+                      { label: 'TGH', val: c.stats?.toughness || 50, color: '#66cc44' },
+                    ].map(s => (
+                      <div key={s.label} style={{ flex: 1 }}>
+                        <div style={{ fontSize: 8, color: s.color, letterSpacing: 1, marginBottom: 2 }}>{s.label}</div>
+                        <div style={{ height: 4, background: '#0a1525', border: '1px solid #1a2a3a' }}>
+                          <div style={{
+                            height: '100%',
+                            width: isSel ? `${s.val}%` : '0%',
+                            background: `linear-gradient(90deg, ${s.color}, ${s.color}88)`,
+                            transition: 'width 0.5s ease 0.1s',
+                          }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </button>
+            );
+          }
+
+          // Locked boss card
+          return (
+            <div
+              key={key}
+              style={{
+                background: '#0a0e14',
+                border: '1px solid #1a2a3a',
+                padding: 0, textAlign: 'left', color: 'var(--text-muted)',
+                transition: 'all 0.3s ease',
+                overflow: 'hidden',
+                opacity: 0.6,
+                position: 'relative',
+                cursor: 'not-allowed',
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+                borderBottom: '1px solid #1a2a3a',
+                filter: 'grayscale(1)',
+              }}>
+                <div style={{
+                  width: 48, height: 48, background: '#111',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 24, color: '#333',
+                }}>?</div>
+                <div>
+                  <div style={{
+                    fontSize: 14, fontWeight: 700, color: '#3a4a5a',
+                    textTransform: 'uppercase', letterSpacing: 1,
+                  }}>
+                    ???
+                  </div>
+                  <div style={{
+                    fontSize: 9, color: '#2a3a4a', letterSpacing: 1, fontWeight: 600,
+                  }}>
+                    BOSS
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px' }}>
+                <div style={{
+                  fontSize: 11, color: '#2a3a4a', lineHeight: 1.4,
+                  fontStyle: 'italic',
+                }}>
+                  Defeat to unlock
+                </div>
+              </div>
+              <div style={{
+                position: 'absolute', top: 8, right: 8,
+                fontSize: 16, color: '#2a3a4a',
+              }}>
+                &#128274;
+              </div>
+            </div>
           );
         })}
       </div>

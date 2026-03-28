@@ -335,50 +335,60 @@ button:active { transform: scale(0.97); }
   100% { transform: translate(-50%, -50%) scale(1.0); opacity: 0; }
 }
 
-/* ===== COMPONENT PATTERNS ===== */
+/* ===== COMPONENT PATTERNS — Angled Sci-Fi Aesthetic ===== */
 
-/* Panel / Card */
+/* Panel — angled top-left, bottom-right corners */
 .panel {
-  background: var(--bg-card);
+  background: linear-gradient(160deg, var(--bg-card) 0%, #080e1a 100%);
   border: 1px solid var(--border);
+  border-top: 1px solid rgba(0,200,255,0.12);
   padding: 16px;
+  clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
 }
 
-/* Interactive Card */
+/* Interactive Card — subtle angle, glow on hover */
 .card {
-  background: var(--bg-card);
+  background: linear-gradient(160deg, var(--bg-card) 0%, #080e1a 100%);
   border: 1px solid var(--border);
   padding: 16px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: all 0.2s ease;
   position: relative;
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
 }
 .card:hover {
   border-color: var(--border-hover);
-  background: var(--bg-surface);
+  background: linear-gradient(160deg, var(--bg-surface) 0%, #0c1525 100%);
 }
 .card.selected {
   border-color: var(--cyan);
-  background: #0a1a2e;
-}
-.card.selected::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border: 1px solid rgba(0, 200, 255, 0.3);
-  pointer-events: none;
+  background: linear-gradient(160deg, #0a1a2e 0%, #061222 100%);
+  box-shadow: 0 0 15px rgba(0,200,255,0.08);
 }
 
-/* Section Headers — // prefix convention */
+/* Section Headers — angled underline accent */
 .section-header {
   font-size: 10px;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: relative;
 }
 .section-header::before {
   content: '// ';
+}
+.section-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 40px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
 }
 .section-header.accent-cyan { color: var(--cyan); }
 .section-header.accent-green { color: var(--green); }
@@ -511,49 +521,90 @@ button:active { transform: scale(0.97); }
   padding: 16px;
 }
 
-/* Action Buttons */
+/* Action Buttons — angled sci-fi style */
 .btn {
-  background: transparent;
-  border: 1px solid var(--cyan);
-  color: var(--cyan);
+  position: relative;
+  background: linear-gradient(135deg, rgba(0,180,255,0.15) 0%, rgba(0,100,180,0.08) 100%);
+  border: none;
+  border-top: 1px solid rgba(0,200,255,0.4);
+  border-bottom: 1px solid rgba(0,200,255,0.2);
+  color: #70ddff;
   font-family: var(--font-mono);
   font-size: 11px;
+  font-weight: 700;
   letter-spacing: 2px;
-  padding: 8px 24px;
+  padding: 10px 28px;
   cursor: pointer;
   text-transform: uppercase;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  transition: all 0.15s ease;
 }
-.btn:hover { background: rgba(0, 200, 255, 0.1); }
-.btn.graft { border-color: #2a8a55; color: #66ee88; }
-.btn.graft:hover { background: rgba(0, 255, 136, 0.1); }
-.btn.danger { border-color: #5a2a2a; color: #ee6666; }
-.btn.danger:hover { background: rgba(238, 102, 102, 0.1); }
-.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn:hover {
+  background: linear-gradient(135deg, rgba(0,200,255,0.25) 0%, rgba(0,120,200,0.15) 100%);
+  color: #fff;
+  text-shadow: 0 0 8px rgba(0,200,255,0.5);
+}
+.btn:active { transform: scale(0.96); filter: brightness(1.3); }
+.btn.graft {
+  background: linear-gradient(135deg, rgba(0,255,136,0.15) 0%, rgba(0,180,80,0.08) 100%);
+  border-top-color: rgba(0,255,136,0.4);
+  border-bottom-color: rgba(0,255,136,0.2);
+  color: #66ee88;
+}
+.btn.graft:hover { background: linear-gradient(135deg, rgba(0,255,136,0.25) 0%, rgba(0,200,100,0.15) 100%); color: #aaffcc; }
+.btn.danger {
+  background: linear-gradient(135deg, rgba(238,102,102,0.15) 0%, rgba(180,60,60,0.08) 100%);
+  border-top-color: rgba(238,102,102,0.4);
+  border-bottom-color: rgba(238,102,102,0.2);
+  color: #ee6666;
+}
+.btn.danger:hover { background: linear-gradient(135deg, rgba(238,102,102,0.25) 0%, rgba(200,80,80,0.15) 100%); color: #ff8888; }
+.btn:disabled { opacity: 0.25; cursor: not-allowed; filter: saturate(0.3); }
+.btn:disabled:hover { background: linear-gradient(135deg, rgba(0,180,255,0.15) 0%, rgba(0,100,180,0.08) 100%); color: #70ddff; text-shadow: none; }
 
-/* Status Badges */
+/* Secondary button — outline only, for less important actions */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #2a3a4a;
+  color: #5a7a8a;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 7px 20px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.btn-ghost:hover { border-color: #4a6a7a; color: #8aaabc; background: rgba(255,255,255,0.03); }
+
+/* Status Badges — angled micro-chips */
 .badge {
   font-size: 9px;
-  padding: 2px 6px;
+  padding: 2px 8px;
   letter-spacing: 1px;
   text-transform: uppercase;
   display: inline-block;
+  font-weight: 700;
+  clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
 }
-.badge-ready  { background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); color: #66ee88; }
-.badge-new    { background: rgba(0,200,255,0.1); border: 1px solid rgba(0,200,255,0.3); color: #44ccff; }
-.badge-locked { background: rgba(100,100,100,0.1); border: 1px solid rgba(100,100,100,0.3); color: #4a5a5a; }
-.badge-weak   { background: rgba(238,102,102,0.1); border: 1px solid rgba(238,102,102,0.3); color: #ee6666; }
+.badge-ready  { background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,255,136,0.08)); color: #66ee88; }
+.badge-new    { background: linear-gradient(135deg, rgba(0,200,255,0.2), rgba(0,200,255,0.08)); color: #44ccff; }
+.badge-locked { background: linear-gradient(135deg, rgba(100,100,100,0.15), rgba(100,100,100,0.05)); color: #4a5a5a; }
+.badge-weak   { background: linear-gradient(135deg, rgba(238,102,102,0.2), rgba(238,102,102,0.08)); color: #ee6666; }
 
-/* NPC Dialogue Bar */
+/* NPC Dialogue Bar — angled left edge */
 .npc-bar {
-  background: var(--bg-card);
+  background: linear-gradient(90deg, rgba(10,18,32,0.95) 0%, var(--bg-card) 100%);
   border: 1px solid var(--border);
-  border-left: 2px solid var(--green);
+  border-left: 3px solid var(--green);
   padding: 10px 14px;
+  clip-path: polygon(0% 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
 }
 .npc-bar.vex { border-left-color: var(--purple); }
 .npc-bar .npc-name {
   font-size: 10px;
-  letter-spacing: 1px;
+  font-weight: 700;
+  letter-spacing: 2px;
   text-transform: uppercase;
   margin-bottom: 4px;
 }

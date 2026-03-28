@@ -43,7 +43,7 @@ export default function CharacterPreview({ species, view = 'front', playerBuild,
         return (
           <img
             key={slot}
-            src={`/assets/mutations/MUT_${data.mutation}_${view}.png`}
+            src={new URL(`../assets/mutations/mut_${data.mutation}.png`, import.meta.url).href}
             alt={data.mutation}
             className={`slot-mutation${isHighlighted ? ' highlighted' : ''}`}
             style={{

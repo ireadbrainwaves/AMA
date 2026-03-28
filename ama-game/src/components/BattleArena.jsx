@@ -8,7 +8,8 @@ import { TECH_ENHANCEMENTS } from '../data/constants';
  * Get the sprite path for a mutation overlay.
  */
 function getMutationSpritePath(mutationId, view) {
-  return `/assets/mutations/MUT_${mutationId}_${view}.png`;
+  // PixelLab-generated overlays — single view per mutation (used for both front/back)
+  return new URL(`../assets/mutations/mut_${mutationId}.png`, import.meta.url).href;
 }
 
 /**
