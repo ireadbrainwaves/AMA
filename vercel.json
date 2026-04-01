@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd ama-game && npm install && npx vite build",
+  "outputDirectory": "ama-game/dist",
+  "framework": null
+}
