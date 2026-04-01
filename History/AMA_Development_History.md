@@ -1351,3 +1351,397 @@ Modified:
   src/screens/HubWorld2D.jsx           — Added settings gear button (top-right)
   src/App.jsx                          — FightIntro/SettingsScreen/MusicManager/SaveManager imports, useEffect for music, showSettings/showFightIntro state, handleContinueRun, startFightWithIntro, auto-save in fadeToScreen, clearSave on victory/defeat, onContinue prop to CharacterSelect
 ```
+
+---
+
+## Session 5 — 8-Fight Ladder Expansion + 6 New Species
+
+### Overview
+Massive content expansion: tournament ladder doubled from 4 fights to 8, three new unlockable playable species added (Iron Mantis, Voltamander, Mycelith), three new boss/mini-boss opponents added (Glass Viper, Null Worm, Bone Hydra). Parasitex remains the final boss of the demo at Fight 8. Full unlock system integrated into meta-progression.
+
+### New Species — Playable (Unlockable)
+
+#### Iron Mantis — "The Lock" (Grappler)
+- **BST 200:** ATK 55 / DEF 60 / WIL 35 / TGH 50
+- **Passive: Vice Grip** — Winning a GRAB matchup "clamps" the target mutation for 2 turns. Clamped mutations can't be used; clamped resources lose 1/turn.
+- **Moveset:** Pincer Crush (GRAB, 2 cost, clamps on win), Lock & Tear (GRAB, 3 cost, Body direct), Carapace Brace (DEFENSE, half damage), Leg Sweep (FAST, drains 2 stamina), Hydraulic Crush (FINISHER, 5 cost, requires clamped mutation)
+- **4 mutations:** Hydraulic Pincers (arms, adds Pincer Lock), Compound Eyes (head, see opponent stamina push), Carapace Plating (chest, -1 from FAST/POWER), Anchor Claws (legs, +1 stamina regen)
+- **Starter tech:** Mantis Hydraulics — Pincer Crush → Hydraulic Vice (clamp lasts 3 turns)
+- **Color:** #cc5500 (rust orange)
+
+#### Voltamander — "The Escalation" (Setup/Transform)
+- **BST 200:** ATK 40→70 / DEF 45 / WIL 50 / TGH 65
+- **Passive: Bioelectric Charge** — Gains 1 charge per action (0-10). At 4+: ATK +15, moves gain effects. At 7+: ATK +30, moves cost -1. At 10: AoE discharge 4 to all resources, resets.
+- **Moveset:** Static Lick (FAST, 1 cost, cheapest move), Tail Whip (POWER, 2 cost, chips Composure when charged), Spark Shield (DEFENSE, double charge gain), Discharge Lunge (FAST, 3 cost, split pierce when overcharged), Capacitor Burst (FINISHER, 6 cost, damage = base + charge, requires 7+ charge)
+- **4 mutations:** Spark Arms (arms, adds Spark Jab), Bioelectric Nodes (head, thorns 1 Body), Conductive Skin (chest, +1 stamina on matchup win), Capacitor Tail (legs, mini charge system)
+- **Starter tech:** Surge Capacitor — Static Lick → Surge Lick (2 charge per action)
+- **Color:** #00e5ff (electric cyan)
+
+#### Mycelith — "The Colony" (Swarm/Summon)
+- **BST 200:** ATK 35 / DEF 55 / WIL 60 / TGH 50
+- **Passive: Sporulation** — End of every turn, spawns 1 Spore Construct (max 3, 4HP each). Each construct deals 1 Body chip/turn. AREA attacks hit all constructs.
+- **Moveset:** Spore Burst (AREA, 2 cost, Composure + splash), Mycelium Grasp (GRAB, 2 cost, Entangle), Fungal Wall (DEFENSE, double spawn), Decompose (PSYCHIC, 3 cost, bonus per empty mutation slot), Bloom (FINISHER, 5 cost, detonates all constructs, +2 per construct)
+- **4 mutations:** Spore Sacs (arms, spawn construct once/fight), Decomposer Node (head, +1 vs fewer mutations), Cap Shield (chest, temp shield on hit), Mycelium Network (legs, +1 regen to most damaged resource)
+- **Starter tech:** Mycorrhizal Boost — Fungal Wall → Spore Fortress (triple spawn)
+- **Color:** #66ff66 (bioluminescent green)
+
+### New Species — Boss/Mini-Boss (Opponents Only)
+
+#### Glass Viper — "The Assassin" (Mini-Boss, Fight 6)
+- **BST 200:** ATK 80 / DEF 20 / WIL 40 / TGH 60
+- **Passive: Stealth Strike** — Starts invisible. First attack guaranteed to land. Visible for 2 turns after attacking. Can re-stealth with Fade. Stealth attacks deal +50% damage.
+- **Highest Attack in the game. Lowest Defense. Glass cannon.**
+- **Moveset:** Venom Strike (FAST, 3 cost, 4 base + stealth bonus), Coil Lunge (POWER, 2 cost), Fade (EVASION, 1 cost, re-stealth), Constrict (GRAB, 3 cost), Glass Fang (FINISHER, 5 cost, requires Guard broken)
+- **3 mutations:** Glass Fang (arms, first attack guaranteed), Refraction Skin (chest, 20% miss chance), Venom Glands (head, first hit DoT)
+- **Counter-mechanic flag, scout warning about stealth**
+- **Color:** #00ff44
+
+#### Null Worm — "The Void" (Mini-Boss, Fight 6 alt)
+- **BST 220 (mini-boss tier):** ATK 50 / DEF 50 / WIL 50 / TGH 70
+- **Passive: Null Field** — All tech enhancements disabled during fight. Starter techs revert to base moves. Player fights with raw species kit + mutations only.
+- **The ultimate build check — tests if your species + mutations are strong without tech.**
+- **Moveset:** Void Bite (POWER, 2 cost), Null Pulse (AREA, 2 cost, Composure + splash), Segment Coil (GRAB, 3 cost), Void Shroud (DEFENSE, half damage), Annihilate (FINISHER, 5 cost, requires Composure broken)
+- **3 mutations:** Void Segment (chest, suppress opponent tech 2 turns), Null Tooth (arms, +1 vs 3+ tech), Absence Lobe (head, immune to mental corruption)
+- **Boss flag + counter-mechanic flag**
+- **Color:** #4400aa
+
+#### Bone Hydra — "The Heads" (Boss, Fight 7)
+- **BST 220 (mini-boss tier):** ATK 55 / DEF 50 / WIL 30 / TGH 65
+- **Passive: Regrowth** — 3 heads, each with 8 HP and its own move. Destroying a head removes its move. After 3 turns, the head regenerates at full HP.
+- **Multi-target boss — heads are regenerating mutation-like targets.**
+- **Moveset:** Fang Strike (FAST, head 0), Bone Crush (POWER, head 1), Skull Scream (PSYCHIC, head 2), Marrow Shield (DEFENSE, half damage), Hydra Fury (FINISHER, 6 cost, +2 per active head, requires Guard broken)
+- **3 mutations:** Hydra Skull (head, self-regen after 4 turns), Ribcage Armor (chest, 15 HP tank), Bone Claw (arms, adds Bone Rip GRAB +2 to mutations)
+- **Boss flag + counter-mechanic flag**
+- **Color:** #881a1a
+
+### 8-Fight Ladder Structure
+
+```
+Fight 1-3:  Standard species (shuffled from 7-species pool, no repeats)
+            Pool: Cyber Gorilla, Psycho Squid, Bee Swarm, Terror Pin Turtle,
+                  Iron Mantis, Voltamander, Mycelith
+Fight 4:    Counter-mechanic (Echomorph or Hydravine)
+Fight 5:    Mixed pool (remaining standard or counter)
+Fight 6:    Glass Viper OR Null Worm (mini-boss)
+Fight 7:    Bone Hydra (boss)
+Fight 8:    Parasitex (final boss — unchanged)
+```
+
+- No opponent repeats within a run (shuffle + unique-pick system)
+- Prize money scaled: 150 / 200 / 300 / 400 / 500 / 600 / 700 / 0
+- `TOTAL_FIGHTS` constant replaces hardcoded 4 throughout codebase
+
+### Unlock System
+
+- New `UNLOCKABLE_SPECIES` constant: `['ironMantis', 'voltamander', 'mycelith']`
+- Meta-progression gains `unlockedSpecies: []` array
+- When player defeats an unlockable species as opponent → species ID added to `unlockedSpecies`
+- Character Select dynamically builds playable list: base 4 + unlocked species
+- Locked species shown as greyed silhouette cards with lock icon and "Defeat this species to unlock" text
+- Archetype labels added: GRAPPLER, ESCALATION, COLONY
+
+### Hub World Changes
+
+- Arena doors expanded from 4 to 8 (two rows of 4)
+- Top row: Arenas 1-4 (row 2)
+- Bottom row: Arenas 5-8 (row 4)
+- All `i < 4` arena checks updated to `i < 8`
+- Arena counter updated: "arenas: X/8"
+
+### UI Reference Updates
+
+- FightIntro: "Fight X of 4" → "Fight X of 8"
+- SettingsScreen: "Best Run: X/4 fights" → "X/8 fights"
+- CharacterSelect: "X/4 cleared" → "X/8 cleared", "Best: X/4" → "Best: X/8"
+- HubWorld2D: "arenas: X/4" → "arenas: X/8"
+
+### Sprite Assets
+
+- 12 new placeholder PNGs generated (front + back for 3 playable, front only for 3 bosses)
+- 120x160 RGBA, colored silhouettes with species name text
+- Located at `src/assets/sprites/{speciesId}_{front|back}.png`
+- Ready for replacement with proper dark/gritty pixel art
+
+### Balance Notes (from Claude Code linter — Session 4, carried forward)
+
+- STAMINA_REGEN: 2 → 3
+- Gorilla: ATK 75→65, WIL 30→40
+- Squid: ATK 35→40, DEF 30→40, WIL 75→65, TGH 40→45
+- Bee: ATK 60→50, DEF 25→40, WIL 40→45, TGH 55→50
+- Turtle: DEF 75→60, WIL 20→40, TGH 65→60
+
+### File Changes
+
+```
+Modified:
+  src/data/characters.js              — Added 6 new species (Iron Mantis, Voltamander, Mycelith, Glass Viper, Null Worm, Bone Hydra) with full movesets, passives, stats
+  src/data/mutations.js               — Added mutations for all 6 new species (4 each for playable, 3 each for bosses), updated SPECIES_WEAKNESS/RESISTANCE maps
+  src/data/constants.js               — 8-fight prize money, TOTAL_FIGHTS=8, UNLOCKABLE_SPECIES, 3 new starter techs, unlockedSpecies in meta
+  src/data/spriteMap.js               — Added imports for all 6 new species sprites
+  src/App.jsx                         — New 8-fight generateArenaStates() with shuffle/unique-pick, STANDARD_SPECIES expanded to 7, MINIBOSS_SPECIES/BOSS_SPECIES arrays, unlock system in handleFightEnd, TOTAL_FIGHTS import
+  src/screens/CharacterSelect.jsx     — Dynamic playable list from unlocks, locked character cards with silhouettes, UNLOCKABLE_SPECIES import, archetype labels for new species
+  src/screens/HubWorld2D.jsx          — 8 arena doors (two rows), all arena checks updated from 4 to 8
+  src/screens/FightIntro.jsx          — "Fight X of 8" display
+  src/screens/SettingsScreen.jsx      — "Best Run: X/8 fights" display
+
+New:
+  src/assets/sprites/ironMantis_front.png      — Placeholder sprite
+  src/assets/sprites/ironMantis_back.png       — Placeholder sprite
+  src/assets/sprites/voltamander_front.png     — Placeholder sprite
+  src/assets/sprites/voltamander_back.png      — Placeholder sprite
+  src/assets/sprites/mycelith_front.png        — Placeholder sprite
+  src/assets/sprites/mycelith_back.png         — Placeholder sprite
+  src/assets/sprites/glassViper_front.png      — Placeholder sprite
+  src/assets/sprites/nullWorm_front.png        — Placeholder sprite
+  src/assets/sprites/boneHydra_front.png       — Placeholder sprite
+```
+
+### Known Remaining Work
+
+- **Placeholder sprites** need replacement with proper dark/gritty pixel art (original style, not v2)
+- **Fight HUD buffs display** — State variables exist in FightScreen.jsx but no visual buff tray in the HUD (incomplete from Session 4)
+- **New passive mechanics** not yet wired into FightScreen combat engine: Vice Grip (clamping), Bioelectric Charge (scaling), Sporulation (constructs), Stealth Strike (invisibility), Null Field (tech suppression), Regrowth (heads). Data is defined, combat logic TBD.
+- **Music integration** — MusicManager system ready, awaiting user's jungle beat audio files
+- **Mutation overlay sprites** needed for all 6 new species (per body slot)
+
+---
+
+## Session 16 — Hub World Redesign & PixelLab Pipeline (2026-03-27)
+
+### What existed before this session
+- Hub world ("The Ark") in HubWorld2D.jsx (1328 lines) — 26x20 tile grid at 24px, entirely procedural Canvas fillRect rendering
+- T-shaped layout: arena gallery top, central corridor spine, left wing (mutation lab), right wing (tech workshop), upper right (command post)
+- Full lighting system: offscreen light map canvas, multiply blend, additive bloom, particles, CRT scanlines, vignette
+- AI art backgrounds loaded at low opacity behind procedural tiles (workshop_sq, mutlab_sq, cmdpost_sq, gallery_sq, corridor_sq, terminal_sq, floor_64)
+- PixelLab pipeline built (pipeline/ dir): config.py, layer1_generate.py, layer2_process.py, layer3_compose.py, layer4_export.py, ama_pipeline.py CLI
+- 13 species defined in pipeline config with descriptions, palettes, anchor points
+- 28 mutation overlays defined, 6 hub tilesets defined (floor, wall, arena_1-4)
+- PixelLab MCP server registered (`claude mcp add pixellab https://api.pixellab.ai/mcp`) but tools not loading in session
+
+### What was planned
+
+#### Hub World Redesign — Cross/Plus Layout
+New layout replacing the T-shape:
+```
+              ┌─────────────────────────┐
+              │    ARENA CORRIDOR       │
+              │  [1] [2] [3] [4]       │
+              │  [5] [6] [7] [8]       │
+              └───────────┬─────────────┘
+                          │
+     ┌────────────┐  ┌────┴────┐  ┌────────────┐
+     │ MUTATION   │  │         │  │ TECH       │
+     │ LAB        ├──┤  MAIN   ├──┤ WORKSHOP   │
+     │ (Helix)    │  │  HALL   │  │ (Ark)      │
+     └────────────┘  │         │  └────────────┘
+                     ├─────────┤
+                     │ COMMAND │
+                     │ POST    │
+                     │ (Vex)   │
+                     └────┬────┘
+                        SPAWN
+```
+
+- Grid: ~30x26 tiles at 32x32px (960x832 canvas), up from 26x20 at 24px
+- Spawn at bottom, progression pulls north toward arenas
+- Distinct zone theming per room
+
+#### 13 New Tilesets for PixelLab Generation
+Replacing the 6 old tileset defs with 13 zone-specific Wang tilesets:
+
+**Batch 1 — Base:** `base_floor` (dark industrial metal), `hull_wall` (riveted bulkhead), `corridor` (LED strip walkway)
+**Batch 2 — Main/Arena:** `hall_floor` (cyan accent grid), `hall_grate` (ventilation mesh), `arena_floor` (hazard markings), `arena_door` (energy field doorframe)
+**Batch 3 — Bio Lab (green):** `bio_floor` (bioluminescent vein cracks), `bio_wall` (specimen tanks)
+**Batch 4 — Tech Shop (amber):** `tech_floor` (oil-stained, cable conduits), `tech_wall` (tool racks, welding marks)
+**Batch 5 — Command (purple):** `cmd_floor` (military trim), `cmd_wall` (tactical displays)
+
+All use: 32x32 tiles, high top-down view, single color black outline, basic shading, medium detail, dark gritty 16-bit SNES style.
+
+### Blockers
+- PixelLab MCP server registered but tools not loading in Claude Code session — needs session restart or MCP reconnection before tileset generation can begin
+- Plan saved at `.claude/plans/generic-launching-muffin.md` for next session pickup
+
+### File Changes
+```
+No code changes this session — planning only.
+
+Plan file created:
+  .claude/plans/generic-launching-muffin.md  — Full tileset generation plan with descriptions, batches, execution steps
+```
+
+### Next Steps (from Session 16)
+1. ~~Fix PixelLab MCP tool loading~~ ✓
+2. ~~Update config.py with tileset definitions~~ → Replaced with new pipeline
+3. ~~Generate all tilesets via PixelLab API~~ ✓
+4. ~~Rewrite HubWorld2D.jsx~~ ✓
+5. ~~Keep existing lighting system~~ ✓
+
+---
+
+## Session 17 — Hub World Rewrite, PixelLab Pipeline, Combat Passives, Full Sprite Set (2026-03-27/28)
+
+### What existed before this session
+- Hub world: T-shaped layout, 26x20 grid at 24px tiles, procedural rendering
+- PixelLab MCP registered but tools not loading
+- Old Python pipeline (config.py, layer scripts) — non-functional
+- 6 new species passives defined in characters.js but not wired into combat
+- Fight HUD had no visual buff tray
+- Placeholder/corrupted sprites for most species
+- No animation system
+
+### PixelLab Pipeline Rebuild
+Scrapped the old Python pipeline entirely. Built new Node.js pipeline with 3 non-blocking scripts:
+- **`pipeline/submit.mjs`** — Fire-and-forget job creation, writes IDs to manifest.json
+- **`pipeline/status.mjs`** — Check all jobs, no waiting/polling
+- **`pipeline/download.mjs`** — Download completed jobs, skip what's done, `--copy` flag copies to game assets
+
+Key fix: PixelLab MCP needed `Accept: application/json, text/event-stream` header. Download redirects needed auth stripped on redirect (302 → signed URL).
+
+### Assets Generated (79 total via PixelLab)
+**Hub Map Objects (13):** npc_helix, npc_ark, npc_vex, bio_tank, lab_bench, weapon_rack, tech_workbench, tech_crate, cmd_console, terminal, arena_door, holo_display, player
+
+**Hub Room Backgrounds (8):** room_mutlab, room_workshop, room_arena, room_cmdpost, room_mainhall, room_centralhub, room_library, room_specieslab
+
+**Hub Tilesets (7):** base_floor, corridor, hall_floor, bio_floor, tech_floor, cmd_floor, grate
+
+**Elevator Pad (1):** elevator_pad for arena launch bay
+
+**Species Back Sprites (7):** gorilla, squid, bee, turtle, mantis, voltamander, mycelith
+
+**Mutation Overlays (46):** All 46 mutations across 13 species — 4 body slots (head, arms, chest, legs)
+
+### Hub World Redesign — Three Iterations
+
+**V1: Cross/Plus Layout (30x26 grid, 32px tiles)**
+- Arena corridor top, wings left/right, command post bottom, spawn entry
+- Replaced 8 arena doors with single elevator launch pad
+- All PixelLab objects and room backgrounds wired in
+- Added camera following player at 2x zoom
+
+**V2: 6-Room Radial Layout (50x50 grid)**
+- Central hub (14x14) with 6 rooms radiating outward
+- Arena bay (north), Mutation lab (west), Tech workshop (east)
+- Vex command (south), Library (southwest), Species lab (southeast)
+- 4-tile wide corridors connecting everything through hub center
+
+**V3: L-Shapes + Design Rules (current)**
+Applied research from Pokemon, Zelda, Hades, SNES RPGs:
+- L-shaped rooms with alcoves (mutlab specimen chamber, tech storage)
+- Pinched corridors (4 wide → 2 at midpoint → 4 wide)
+- Airlock buffer zones at room-corridor junctions
+- Varied room sizes (hub 14x14, library 8x8, arena 14x10, species lab 12x8)
+- ~40% furniture coverage per room
+- LED spotlight patterns around key interactables
+
+### Combat Passives Wired (6 new mechanics)
+
+**Iron Mantis — Vice Grip:** GRAB win clamps opponent mutation for 2 turns. Clamped mutations lose 1 HP/turn and can't use their moves.
+
+**Voltamander — Bioelectric Charge:** 0-10 charge counter. +1 per action. At 4+: +1 damage. At 7+: +2 damage, -1 move cost. At 10: AoE discharge 4 to all resources, resets.
+
+**Mycelith — Sporulation:** Spawns 1 Spore Construct end of turn (max 3, 4HP each). Each deals 1 Body chip/turn. AREA attacks damage all constructs.
+
+**Glass Viper — Stealth Strike:** Starts invisible. +50% damage from stealth. Visible 2 turns after attacking. Fade move re-stealths.
+
+**Null Worm — Null Field:** Strips player's tech-enhanced moves. Fight with raw species kit + mutations only.
+
+**Bone Hydra — Regrowth:** 3 heads as targets (8HP each). Destroying a head removes its move. Regenerates at full HP after 3 turns.
+
+### Fight HUD Buff Tray
+Player-side buff tray shows: shield, focus, flash, scramble, scan, adrenaline, camo, entangled, venom, clamped mutations, voltamander charge, spore constructs, stealth status, hydra heads.
+
+Opponent-side buff tray shows: stealth, charge, spores, hydra heads, venom.
+
+### Fight Screen Overhaul
+
+**FightArena component** — HTML/CSS arena replacing PIXI BattleArena. Dark gradient background, floor grid, species-colored spotlights, ground shadows, vignette + CRT scanlines.
+
+**FighterSprite component** — Frame-by-frame animated sprites. Plays idle/attack/hit/special/ko animations at configurable FPS. Loops idles, holds last frame on one-shots. Falls back to static sprite.
+
+**Animation system** — `animationMap.js` auto-imports all frames via Vite glob. 8 species have full animation sets (gorilla, squid, turtle, ironMantis, echomorph, parasitex, hydravine, boneHydra).
+
+**Staggered combat** — Player attacks first → opponent hit reaction → opponent attacks → player hit reaction. Finisher moves use `special` animation.
+
+**Redesigned move cards:**
+- Name + type badge (color-coded)
+- Damage preview + stamina cost
+- Matchup arrows (▲ beats, ▼ loses)
+- Bonus tags (FLOW, WIN:+1 STM, WIN:STEAL, FINISHER)
+- After-turn stamina preview when selected
+
+**Redesigned top bar** — Prominent opponent intent display with icons (💀 FINISHING MOVE, 🛡 DEFENDING, ⚔ ATTACKING, etc.)
+
+**Bug fix:** Item use was stuck on PUSH_REVEAL — now schedules resolveTurn after 800ms.
+
+### Species Sprites
+- All 13 species have 8-direction sprite sets (from PixelLab character generator)
+- Sprite map updated: fight screen uses east/west views (fighters face each other)
+- Front/back sprites in `src/assets/sprites/`, 8dir sets in `src/assets/sprites/8dir/`
+- Animation frames in `src/assets/sprites/animations/{species}/{anim}/`
+
+### Library Screen
+Full in-game encyclopedia accessible from Library room:
+- Species list with sprites (left panel)
+- Detail panel showing: name, archetype, passive description, stats bars
+- Every move with: damage, cost, type badge, channel, target, matchup arrows, flavor text, effects, finisher conditions
+- Scout warnings per species
+
+### Mobile Touch Controls
+- Virtual joystick (bottom-left) for WASD movement
+- Action button (bottom-right) for E interaction
+- Only renders on touch devices
+- Simulates keyboard events — zero game code changes needed
+- Viewport locked to prevent pinch-zoom
+
+### Vercel Deployment
+- Added `vercel.json` for subdirectory build (`cd ama-game && npm install && npx vite build`)
+- Output from `ama-game/dist`
+- Auto-deploys on push to main
+
+### File Changes
+```
+New files:
+  vercel.json                                    — Vercel build config
+  ama-game/pipeline/api.mjs                      — Shared PixelLab MCP API helper
+  ama-game/pipeline/submit.mjs                   — Job submission script
+  ama-game/pipeline/status.mjs                   — Job status checker
+  ama-game/pipeline/download.mjs                 — Job downloader
+  ama-game/pipeline/manifest.json                — Job tracking manifest
+  ama-game/src/components/FightArena.jsx          — HTML/CSS fight arena
+  ama-game/src/components/FighterSprite.jsx       — Animated sprite component
+  ama-game/src/components/TouchControls.jsx       — Mobile virtual joystick + action button
+  ama-game/src/data/animationMap.js               — Animation frame auto-loader
+  ama-game/src/screens/LibraryScreen.jsx          — Species encyclopedia screen
+  ama-game/src/assets/hub/objects/*.png            — 22 PixelLab map objects + room backgrounds
+  ama-game/src/assets/hub/tilesets/*.png           — 7 PixelLab tilesets
+  ama-game/src/assets/mutations/mut_*.png          — 46 mutation overlay sprites
+  ama-game/src/assets/sprites/8dir/*/              — 8-direction sprites for all 13 species
+  ama-game/src/assets/sprites/animations/*/        — Animation frames for 8 species
+
+Modified:
+  ama-game/src/screens/HubWorld2D.jsx              — Complete rewrite (3 iterations)
+  ama-game/src/screens/FightScreen.jsx             — Passives, buff tray, move cards, animations, item fix
+  ama-game/src/data/spriteMap.js                   — East/west views for fight screen
+  ama-game/src/components/BattleArena.jsx          — Mutation sprite path fix
+  ama-game/src/components/CharacterPreview.jsx     — Mutation sprite path fix
+  ama-game/src/App.jsx                             — Library/Species Lab interactions, touch controls
+  ama-game/index.html                              — Mobile viewport lock
+
+Deleted:
+  ama-game/pipeline/config.py                      — Old Python pipeline
+  ama-game/pipeline/ama_pipeline.py                — Old Python pipeline
+  ama-game/pipeline/layer1-4_*.py                  — Old Python pipeline
+  ama-game/pipeline/batch_generate.py              — Old Python pipeline
+  ama-game/pipeline/requirements.txt               — Old Python pipeline
+```
+
+### Known Remaining Work
+- **Hub map polish:** Some corridor connections may have 1-tile gaps. Room backgrounds need style consistency pass.
+- **5 species missing animations:** beeSwarm, voltamander, mycelith, glassViper, nullWorm
+- **329 mutation character variants:** Script ready but not yet run (species × mutation visual combos)
+- **Tech icons:** 20 shop UI icons for Ark's tech store
+- **Fight screen backgrounds:** Per-arena unique backdrops
+- **Mutation grafting system:** Current overlays are standalone PNGs, not properly fitted to species body slots. Character-based variant system prototyped but needs full generation.
+- **Balance pass:** 46 mutations × 7 species needs extensive playtesting
+- **Run variety:** Straight 8-fight ladder, no map pathing choices yet
+- **Music integration:** MusicManager ready, awaiting audio files
