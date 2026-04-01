@@ -109,6 +109,35 @@ const JOBS = {
       tool: 'create_map_object',
       args: { description: `dark sci-fi spaceship main corridor hallway, ${ROOM_STYLE}, cyan LED strip lighting along floor edges, long rectangular corridor with dark metal walls, ceiling pipes and conduits, minimal and industrial, connecting passage`, width: 352, height: 352, ...ROOM_COMMON },
     },
+    room_library: {
+      tool: 'create_map_object',
+      args: { description: `dark sci-fi library archive room, top-down game map tile, dark metal floor, holographic bookshelves along walls with glowing cyan data tablets, central reading terminal, dim blue ambient light, ancient alien knowledge storage, pixel art tilemap style, flat 2D overhead`, width: 384, height: 320, ...ROOM_COMMON },
+    },
+    room_specieslab: {
+      tool: 'create_map_object',
+      args: { description: `dark sci-fi specimen observation lab, top-down game map tile, dark metal floor, glass containment pods along walls showing alien silhouettes, holographic species displays, scanning equipment, cyan and green accent lighting, xenobiology research room, pixel art tilemap style, flat 2D overhead`, width: 384, height: 320, ...ROOM_COMMON },
+    },
+    room_centralhub: {
+      tool: 'create_map_object',
+      args: { description: `dark sci-fi spaceship central hub room, top-down game map tile, large open dark metal floor with hexagonal pattern, six corridor exits visible at edges, central holographic navigation pillar with cyan glow, ambient floor lighting, main junction point of space station, pixel art tilemap style, flat 2D overhead`, width: 384, height: 384, ...ROOM_COMMON },
+    },
+    // === NEW MAP OBJECTS ===
+    obj_bookshelf: {
+      tool: 'create_map_object',
+      args: { description: `sci-fi holographic bookshelf with glowing data tablets, dark metal frame, cyan holographic displays, alien library furniture, ${STYLE}`, width: 64, height: 48, view: 'high top-down', ...OBJ_COMMON, shading: 'medium shading' },
+    },
+    obj_specimen_pod: {
+      tool: 'create_map_object',
+      args: { description: `glass containment pod with alien specimen silhouette inside, dark metal base, green scanning light, xenobiology display, ${STYLE}`, width: 48, height: 64, view: 'high top-down', ...OBJ_COMMON, shading: 'medium shading' },
+    },
+    obj_nav_pillar: {
+      tool: 'create_map_object',
+      args: { description: `holographic navigation pillar, tall cylindrical dark metal base with rotating cyan hologram map on top, central hub waypoint marker, ${STYLE}`, width: 64, height: 64, view: 'high top-down', ...OBJ_COMMON },
+    },
+    obj_reading_terminal: {
+      tool: 'create_map_object',
+      args: { description: `sci-fi reading terminal desk, dark metal with holographic screen showing alien text, single seat, library study station, cyan glow, ${STYLE}`, width: 64, height: 48, view: 'high top-down', ...OBJ_COMMON, shading: 'medium shading' },
+    },
     // === MUTATION OVERLAYS (48x48, transparent bg) ===
     // Gorilla
     mut_iron_knuckles: { tool: 'create_map_object', args: { description: `metal fist plates with rivets and pistons, cybernetic arm enhancement, dark steel with blue glow accents, ${SPRITE_TAIL}`, width: 48, height: 48, ...SPRITE_STD } },

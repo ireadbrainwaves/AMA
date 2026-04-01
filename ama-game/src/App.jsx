@@ -10,6 +10,7 @@ import ScoutingScreen from './screens/ScoutingScreen';
 import IntroSequence from './screens/IntroSequence';
 import FightIntro from './screens/FightIntro';
 import SettingsScreen from './screens/SettingsScreen';
+import LibraryScreen from './screens/LibraryScreen';
 import { characters } from './data/characters';
 import { items as allItemPool } from './data/items';
 import { playSound } from './engine/SoundManager';
@@ -242,6 +243,10 @@ export default function App() {
       setHubOverlay('supplies');
     } else if (targetType === 'bracket') {
       setHubOverlay('bracket');
+    } else if (targetType === 'library') {
+      setHubOverlay('library');
+    } else if (targetType === 'specieslab') {
+      setHubOverlay('specieslab');
     } else if (targetType === 'settings') {
       setShowSettings(true);
     }
@@ -724,6 +729,12 @@ export default function App() {
                   Close
                 </button>
               </div>
+            </div>
+          )}
+
+          {(hubOverlay === 'library' || hubOverlay === 'specieslab') && (
+            <div className="hub-overlay" style={{ zIndex: 100 }}>
+              <LibraryScreen onClose={closeHubOverlay} meta={meta} />
             </div>
           )}
         </>

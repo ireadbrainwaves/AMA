@@ -431,6 +431,46 @@
       "status": "downloaded",
       "created": "2026-03-28T00:54:53.059Z",
       "url": "https://api.pixellab.ai/mcp/map-objects/3e8f58e4-aebc-40c8-8862-608ab1834db7/download"
+    },
+    "room_library": {
+      "id": "e4c87d9f-abbe-4184-b8b2-1653dc2064df",
+      "status": "downloaded",
+      "created": "2026-04-01T06:00:54.318Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/e4c87d9f-abbe-4184-b8b2-1653dc2064df/download"
+    },
+    "room_specieslab": {
+      "id": "2731f27a-6c35-4b81-8566-90a16ba87be1",
+      "status": "downloaded",
+      "created": "2026-04-01T06:00:55.127Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/2731f27a-6c35-4b81-8566-90a16ba87be1/download"
+    },
+    "room_centralhub": {
+      "id": "cf1878c4-8bb9-41d1-8e31-e3f9d1a66274",
+      "status": "downloaded",
+      "created": "2026-04-01T06:00:55.993Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/cf1878c4-8bb9-41d1-8e31-e3f9d1a66274/download"
+    },
+    "obj_bookshelf": {
+      "id": "5225249f-5e63-4101-a284-27d218a094fd",
+      "status": "downloaded",
+      "created": "2026-04-01T06:00:56.824Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/5225249f-5e63-4101-a284-27d218a094fd/download"
+    },
+    "obj_specimen_pod": {
+      "id": "0cda1575-6c7f-4529-85c0-0b15e0dba4f4",
+      "status": "downloaded",
+      "created": "2026-04-01T06:00:57.719Z",
+      "url": "https://api.pixellab.ai/mcp/map-objects/0cda1575-6c7f-4529-85c0-0b15e0dba4f4/download"
+    },
+    "obj_nav_pillar": {
+      "id": "9fbaf24c-dd71-4e67-9bc9-cecb214b0b31",
+      "status": "failed",
+      "created": "2026-04-01T06:00:58.525Z"
+    },
+    "obj_reading_terminal": {
+      "id": "897ead02-521d-4661-a053-190d9786e11f",
+      "status": "failed",
+      "created": "2026-04-01T06:00:59.372Z"
     }
   },
   "tilesets": {

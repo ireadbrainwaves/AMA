@@ -5,6 +5,7 @@ import { getAIDecision, getIntentDisplay } from '../engine/AIEngine';
 import { playSound } from '../engine/SoundManager';
 import MatchupGuide from '../components/MatchupGuide';
 import BattleArena from '../components/BattleArena';
+import FightArena from '../components/FightArena';
 import { INITIAL_RESOURCES, MAX_GUARD, MAX_COMPOSURE, MAX_BODY, MAX_STAMINA, STAMINA_CAP, STAMINA_REGEN, MAX_TURNS, MUTATION_HP_SMALL, MUTATION_HP_LARGE, TECH_ENHANCEMENTS, GUARD_REGEN, COMPOSURE_REGEN } from '../data/constants';
 import { speciesMutations, SPECIES_WEAKNESS, SPECIES_RESISTANCE, findMutation } from '../data/mutations';
 import { getTutorialPhase, getTutorialHint, filterMovesForTutorial, shouldUseMatchups, TUTORIAL_PHASES, SIMPLE_PUSH_OPTIONS } from '../engine/TutorialEngine';
@@ -591,9 +592,10 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       // Smoke Bomb — skip to next turn without opponent attacking
       endTurn();
     } else if (aiDecision) {
-      // Opponent's move lands unopposed
+      // Opponent's move lands unopposed — resolve after brief display
       setMatchupResult({ winner: 'b', reason: `Item used — ${aiDecision.move.name} lands unopposed` });
       setPhase(PHASE.PUSH_REVEAL);
+      setTimeout(() => resolveTurn(null, aiDecision.move, 'b', 0, aiDecision.staminaPush), 800);
     } else {
       endTurn();
     }
@@ -649,31 +651,37 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
 
   // RESOLUTION
   function resolveTurn(pMove, oMove, winner, pPush, oPush) {
-    // Sprite animations
-    if (pMove) {
-      setPlayerAnimState('attacking');
+    // Staggered combat animations:
+    // 1. Player attacks → opponent gets hit
+    // 2. Opponent attacks → player gets hit
+    const playerLanded = winner === 'a' || winner === 'both';
+    const oppLanded = winner === 'b' || winner === 'both';
+    const pAnim = pMove?.isFinisher ? 'special' : 'attack';
+    const oAnim = oMove?.isFinisher ? 'special' : 'attack';
+    if (pMove && pPush > 0) {
+      setPlayerAnimState(pAnim);
       setTimeout(() => {
         setPlayerAnimState('idle');
-        if (oMove) setOpponentAnimState('hit');
+        if (playerLanded) setOpponentAnimState('hit');
         setTimeout(() => {
           setOpponentAnimState('idle');
-          if (oMove) {
-            setOpponentAnimState('attacking');
+          if (oMove && oPush > 0) {
+            setOpponentAnimState(oAnim);
             setTimeout(() => {
               setOpponentAnimState('idle');
-              setPlayerAnimState('hit');
-              setTimeout(() => setPlayerAnimState('idle'), 300);
-            }, 400);
+              if (oppLanded) setPlayerAnimState('hit');
+              setTimeout(() => setPlayerAnimState('idle'), 500);
+            }, 600);
           }
-        }, 300);
-      }, 400);
-    } else if (oMove) {
-      setOpponentAnimState('attacking');
+        }, 500);
+      }, 600);
+    } else if (oMove && oPush > 0) {
+      setOpponentAnimState(oAnim);
       setTimeout(() => {
         setOpponentAnimState('idle');
-        setPlayerAnimState('hit');
-        setTimeout(() => setPlayerAnimState('idle'), 300);
-      }, 400);
+        if (oppLanded) setPlayerAnimState('hit');
+        setTimeout(() => setPlayerAnimState('idle'), 500);
+      }, 600);
     }
 
     let newPRes = { ...pRes };
@@ -2022,58 +2030,73 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
       className={shaking ? 'anim-big-shake' : ''}
       style={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden', background: '#050a14' }}
     >
-      {/* ═══ FULL-SCREEN ARENA CANVAS (layer 0) ═══ */}
+      {/* ═══ FULL-SCREEN ARENA (layer 0) ═══ */}
       <div style={{ position: 'absolute', inset: 0 }}>
-        <BattleArena
+        <FightArena
           playerSpecies={playerCharKey}
           opponentSpecies={opponentCharKey}
           playerAnimState={playerAnimState}
           opponentAnimState={opponentAnimState}
-          playerBuild={playerBuild}
-          opponentBuild={opponentBuild}
-          flashMessage={null}
+          playerColor={playerChar.color}
+          opponentColor={oppChar.color}
         />
       </div>
 
       {/* ═══ HUD OVERLAYS (layer 1) ═══ */}
 
-      {/* Top bar — names + turn counter */}
+      {/* Top bar — names + turn counter + intent */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '10px 20px', ...glassPanel, borderTop: 'none', borderLeft: 'none', borderRight: 'none', zIndex: 10,
-        clipPath: 'polygon(0% 0%, 100% 0%, 98% 100%, 2% 100%)',
+        position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'stretch',
+        padding: 0, ...glassPanel, borderTop: 'none', borderLeft: 'none', borderRight: 'none', zIndex: 10,
       }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: playerChar.color, fontFamily: 'var(--font-display)' }}>{playerChar.name}</div>
-          <div style={{ fontSize: 9, fontWeight: 600, color: playerChar.color, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.7 }}>
+        {/* Player name plate */}
+        <div style={{ padding: '10px 20px', borderRight: '1px solid rgba(255,255,255,0.05)', minWidth: 160 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: playerChar.color, fontFamily: 'var(--font-display)', letterSpacing: 1 }}>{playerChar.name}</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: playerChar.color, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.5 }}>
             {playerChar.killHint}
           </div>
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            Turn {turn}/{MAX_TURNS}
+
+        {/* Center — turn counter + phase */}
+        <div style={{ padding: '8px 24px', textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#556677', fontFamily: 'var(--font-mono)', letterSpacing: 2 }}>
+            TURN {turn} / {MAX_TURNS}
           </div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 2 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#aabbcc', textTransform: 'uppercase', letterSpacing: 3, marginTop: 2 }}>
             {phaseLabel[phase]}
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: oppChar.color, fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+
+        {/* Opponent name plate + intent */}
+        <div style={{ padding: '10px 20px', borderLeft: '1px solid rgba(255,255,255,0.05)', minWidth: 160, textAlign: 'right' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: oppChar.color, fontFamily: 'var(--font-display)', letterSpacing: 1 }}>
             {oppChar.name}
-            {oppIntent && phase === PHASE.MOVE_SELECT && (
-              <span style={{ fontSize: 9, padding: '1px 5px', border: '1px solid', borderRadius: 0, textTransform: 'uppercase', letterSpacing: 1,
-                color: oppIntent === 'finishing' ? '#ff4444' : oppIntent === 'defending' ? '#4488cc' : oppIntent === 'targeting' ? '#ccaa22' : oppIntent === 'setup' ? '#66cc44' : '#ee6644',
-                borderColor: oppIntent === 'finishing' ? '#ff4444' : oppIntent === 'defending' ? '#4488cc' : oppIntent === 'targeting' ? '#ccaa22' : oppIntent === 'setup' ? '#66cc44' : '#ee6644',
-              }}>
-                {oppIntent === 'finishing' ? 'KILL' : oppIntent === 'defending' ? 'DEF' : oppIntent === 'targeting' ? 'TGT' : oppIntent === 'setup' ? 'SET' : 'ATK'}
-              </span>
-            )}
-            {revealTurns > 0 && aiMove && phase === PHASE.COMMITTED && (
-              <span style={{ fontSize: 9, padding: '1px 5px', border: '1px solid #44aaff', borderRadius: 0, color: '#44aaff', letterSpacing: 1 }}>
-                📡 {aiMove.name}
-              </span>
-            )}
           </div>
+          {/* Intent display — prominent, StS-style */}
+          {oppIntent && phase === PHASE.MOVE_SELECT && (() => {
+            const intentConfig = {
+              finishing: { label: 'FINISHING MOVE', color: '#ff4444', icon: '💀' },
+              defending: { label: 'DEFENDING', color: '#4488cc', icon: '🛡' },
+              targeting: { label: 'TARGETING GRAFT', color: '#ccaa22', icon: '🎯' },
+              setup: { label: 'BUILDING UP', color: '#66cc44', icon: '⚡' },
+              attacking: { label: 'ATTACKING', color: '#ee6644', icon: '⚔' },
+            };
+            const cfg = intentConfig[oppIntent] || intentConfig.attacking;
+            return (
+              <div style={{ fontSize: 10, fontWeight: 700, color: cfg.color, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                <span style={{ fontSize: 12 }}>{cfg.icon}</span>
+                <span style={{ letterSpacing: 1 }}>{cfg.label}</span>
+              </div>
+            );
+          })()}
+          {revealTurns > 0 && aiMove && phase === PHASE.COMMITTED && (
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#44aaff', marginTop: 3 }}>
+              📡 SCANNED: {aiMove.name}
+            </div>
+          )}
+          {!oppIntent && phase === PHASE.MOVE_SELECT && (
+            <div style={{ fontSize: 9, color: '#334455', marginTop: 3, letterSpacing: 1 }}>INTENT UNKNOWN</div>
+          )}
         </div>
       </div>
 
@@ -2541,7 +2564,7 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flexWrap: 'wrap', justifyContent: 'center' }}>
             {visibleMoves.map((move, idx) => {
               const effCost = getEffectiveCost(move, pBroken, costModifier);
               const canAfford = effCost <= pRes.stamina;
@@ -2552,7 +2575,11 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
               const displayName = isCorrupted && paranoiaData[idx] ? paranoiaData[idx].fakeName : move.name;
               const displayCost = isCorrupted && paranoiaData[idx] ? paranoiaData[idx].fakeCost : effCost;
               const moveColor = TYPE_COLORS[move.moveType] || '#888';
-              const preview = shouldUseMatchups(tutorialPhase) && aiMove ? getMatchupPreview(move, aiMove) : null;
+              const hasFlow = usable && playerLastType !== null && move.moveType !== playerLastType;
+              const dmgPreview = move.baseDamage > 0 ? `${move.baseDamage}${hasFlow ? '+1' : ''} dmg` : move.moveType === 'defense' ? 'Block' : 'Utility';
+              const MATCHUP_MAP = { GRAB: { FAST: 'lose', DEFENSE: 'win', EVASION: 'lose' }, FAST: { GRAB: 'win', AREA: 'lose', DEFENSE: 'lose' }, AREA: { FAST: 'win', DEFENSE: 'lose', EVASION: 'win' }, DEFENSE: { GRAB: 'lose', FAST: 'win', AREA: 'win' }, EVASION: { GRAB: 'win', AREA: 'lose' } };
+              const beats = move.keyword ? Object.entries({ GRAB: 'GRB', FAST: 'FST', AREA: 'ARA', DEFENSE: 'DEF', EVASION: 'EVA' }).filter(([k]) => MATCHUP_MAP[move.keyword]?.[k] === 'win').map(([,v]) => v) : [];
+              const loses = move.keyword ? Object.entries({ GRAB: 'GRB', FAST: 'FST', AREA: 'ARA', DEFENSE: 'DEF', EVASION: 'EVA' }).filter(([k]) => MATCHUP_MAP[move.keyword]?.[k] === 'lose').map(([,v]) => v) : [];
 
               return (
                 <button
@@ -2560,58 +2587,60 @@ export default function FightScreen({ playerCharKey, playerMoves, opponentCharKe
                   onClick={() => usable && setSelectedMove(isSelected ? null : move)}
                   disabled={!usable}
                   style={{
-                    padding: '8px 12px', minWidth: 115, textAlign: 'left',
-                    background: isSelected ? `${moveColor}15` : 'rgba(10,18,30,0.8)',
-                    borderLeft: `3px solid ${isSelected ? moveColor : usable ? moveColor + '55' : '#1a2030'}`,
+                    padding: '10px 14px', minWidth: 130, textAlign: 'left', position: 'relative',
+                    background: isSelected ? `${moveColor}18` : 'rgba(8,14,26,0.9)',
+                    borderLeft: `3px solid ${isSelected ? moveColor : usable ? moveColor + '66' : '#1a2030'}`,
                     borderTop: `1px solid ${isSelected ? moveColor + '44' : '#1a2838'}`,
                     borderRight: `1px solid ${isSelected ? moveColor + '44' : '#1a2838'}`,
                     borderBottom: `1px solid ${isSelected ? moveColor + '44' : '#1a2838'}`,
-                    color: usable ? '#fff' : 'rgba(255,255,255,0.3)',
-                    opacity: usable ? 1 : 0.35, cursor: usable ? 'pointer' : 'not-allowed',
+                    color: usable ? '#fff' : 'rgba(255,255,255,0.25)',
+                    opacity: usable ? 1 : 0.3, cursor: usable ? 'pointer' : 'not-allowed',
                     transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? `0 0 12px ${moveColor}20` : 'none',
-                    clipPath: 'polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%)',
+                    boxShadow: isSelected ? `0 0 16px ${moveColor}30, inset 0 0 20px ${moveColor}08` : 'none',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isSelected ? moveColor : usable ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                  {/* Move name + type badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: isSelected ? moveColor : '#fff' }}>
                       {displayName}
                     </span>
-                    {/* Flow indicator */}
-                    {usable && playerLastType !== null && move.moveType !== playerLastType && (
-                      <span style={{ fontSize: 7, color: '#00ccff', fontWeight: 800, letterSpacing: 1 }}>FLOW</span>
-                    )}
+                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 5px', background: moveColor + '22', color: moveColor, borderRadius: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {TYPE_LABELS[move.moveType]}
+                    </span>
                   </div>
-                  <div style={{ fontSize: 9, color: '#8899aa', marginTop: 2 }}>
-                    <span style={{ color: moveColor, fontWeight: 600 }}>{TYPE_LABELS[move.moveType]}</span>
-                    {' '}<span style={{ fontFamily: 'var(--font-mono)' }}>{displayCost} stm</span>
-                    {/* Stamina interaction hint */}
-                    {move.moveType === 'fast' && <span style={{ color: '#44ff66', marginLeft: 4, fontSize: 8 }}>Win:+1</span>}
-                    {move.moveType === 'grab' && <span style={{ color: '#44ff66', marginLeft: 4, fontSize: 8 }}>Win:steal</span>}
-                    {move.moveType === 'defense' && <span style={{ color: '#44cc66', marginLeft: 4, fontSize: 8 }}>+1 regen</span>}
+
+                  {/* Damage + Cost row */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, fontSize: 11 }}>
+                    <span style={{ color: move.baseDamage > 0 ? '#ddd' : '#668', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                      {dmgPreview}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: displayCost <= pRes.stamina ? 'var(--stamina)' : '#ff4444', fontWeight: 700 }}>
+                      {displayCost} STM
+                    </span>
                   </div>
-                  {/* Beats / Loses hints */}
-                  {isSelected && move.keyword && (
-                    <div style={{ fontSize: 8, marginTop: 3, lineHeight: 1.4 }}>
-                      <span style={{ color: '#44ff66' }}>Beats: {
-                        Object.entries({ GRAB: 'Grab', FAST: 'Fast', AREA: 'Area', DEFENSE: 'Defense', EVASION: 'Evasion' })
-                          .filter(([k]) => {
-                            const row = { GRAB: { FAST: 'lose', DEFENSE: 'win', EVASION: 'lose' }, FAST: { GRAB: 'win', AREA: 'lose', DEFENSE: 'lose', null: 'win' }, AREA: { FAST: 'win', DEFENSE: 'lose', EVASION: 'win' }, DEFENSE: { GRAB: 'lose', FAST: 'win', AREA: 'win' }, EVASION: { GRAB: 'win', AREA: 'lose' } };
-                            return row[move.keyword]?.[k] === 'win';
-                          }).map(([, v]) => v).join(', ') || 'None'
-                      }</span>
-                      {' '}
-                      <span style={{ color: '#ff4444' }}>Loses: {
-                        Object.entries({ GRAB: 'Grab', FAST: 'Fast', AREA: 'Area', DEFENSE: 'Defense', EVASION: 'Evasion' })
-                          .filter(([k]) => {
-                            const row = { GRAB: { FAST: 'lose', DEFENSE: 'win', EVASION: 'lose' }, FAST: { GRAB: 'win', AREA: 'lose', DEFENSE: 'lose', null: 'win' }, AREA: { FAST: 'win', DEFENSE: 'lose', EVASION: 'win' }, DEFENSE: { GRAB: 'lose', FAST: 'win', AREA: 'win' }, EVASION: { GRAB: 'win', AREA: 'lose' } };
-                            return row[move.keyword]?.[k] === 'lose';
-                          }).map(([, v]) => v).join(', ') || 'None'
-                      }</span>
+
+                  {/* Matchup bar — beats/loses */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 5, fontSize: 8, fontWeight: 600 }}>
+                    {beats.length > 0 && <span style={{ color: '#44ff66' }}>▲ {beats.join(' ')}</span>}
+                    {loses.length > 0 && <span style={{ color: '#ff4455' }}>▼ {loses.join(' ')}</span>}
+                  </div>
+
+                  {/* Bonus indicators */}
+                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    {hasFlow && <span style={{ fontSize: 7, color: '#00ccff', fontWeight: 800, padding: '1px 4px', background: 'rgba(0,204,255,0.1)', borderRadius: 2 }}>FLOW +1</span>}
+                    {move.moveType === 'fast' && <span style={{ fontSize: 7, color: '#44ff66', padding: '1px 4px', background: 'rgba(68,255,102,0.08)', borderRadius: 2 }}>WIN: +1 STM</span>}
+                    {move.moveType === 'grab' && <span style={{ fontSize: 7, color: '#ccaa22', padding: '1px 4px', background: 'rgba(204,170,34,0.08)', borderRadius: 2 }}>WIN: STEAL</span>}
+                    {move.moveType === 'defense' && <span style={{ fontSize: 7, color: '#4488cc', padding: '1px 4px', background: 'rgba(68,136,204,0.08)', borderRadius: 2 }}>+1 REGEN</span>}
+                    {move.isFinisher && <span style={{ fontSize: 7, color: '#ff4444', fontWeight: 800, padding: '1px 4px', background: 'rgba(255,68,68,0.12)', borderRadius: 2 }}>FINISHER</span>}
+                    {isCorrupted && <span style={{ fontSize: 7, color: '#aa66ee', fontWeight: 700, padding: '1px 4px', background: 'rgba(170,102,238,0.1)', borderRadius: 2 }}>CORRUPTED?</span>}
+                  </div>
+
+                  {/* After-turn stamina preview */}
+                  {isSelected && (
+                    <div style={{ marginTop: 6, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 9, color: '#6688aa', fontFamily: 'var(--font-mono)' }}>
+                      After: {pRes.stamina - effCost + STAMINA_REGEN} STM
                     </div>
                   )}
-                  {move.isFinisher && <div style={{ fontSize: 8, color: 'var(--lose)', fontWeight: 700, marginTop: 2 }}>FINISHER</div>}
-                  {isCorrupted && <div style={{ fontSize: 8, color: 'var(--composure)', fontWeight: 700, marginTop: 1 }}>CORRUPTED?</div>}
                 </button>
               );
             })}

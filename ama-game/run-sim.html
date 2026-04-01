@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><head><title>AMA Bot Simulator</title></head>
+<body style="background:#111;color:#eee;font-family:monospace;padding:20px">
+<h2>AMA Bot vs Bot Simulator</h2>
+<pre id="output">Loading...</pre>
+<script type="module">
+import { runFullReport, runBatch } from './src/engine/BotSimulator.js';
+
+const out = document.getElementById('output');
+let text = '=== FULL MATCHUP REPORT (100 games each) ===\n\n';
+
+const report = runFullReport();
+for (const r of report) {
+  text += `--- ${r.matchup} ---\n`;
+  text += `  Win Rate:     ${r.winRate}\n`;
+  text += `  Avg Turns:    ${r.avgTurns}\n`;
+  text += `  KO/Decision:  ${r.koRate}\n`;
+  text += `  Stamina Starved: ${r.avgStaminaStarved}\n`;
+  text += `  Turn Distribution: ${JSON.stringify(r.turnDistribution)}\n\n`;
+}
+
+// Target: avg 10-15 turns, <1 stamina starved turn per fight, >60% KO rate
+text += '\n=== TARGETS ===\n';
+text += 'Avg turns: 10-15 (sweet spot)\n';
+text += 'KO rate: >60% (fights should end in KO, not decision)\n';
+text += 'Stamina starved: <1 turn avg (player should always have options)\n';
+
+out.textContent = text;
+</script>
+</body></html>
