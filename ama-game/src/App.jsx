@@ -11,6 +11,7 @@ import IntroSequence from './screens/IntroSequence';
 import FightIntro from './screens/FightIntro';
 import SettingsScreen from './screens/SettingsScreen';
 import LibraryScreen from './screens/LibraryScreen';
+import TouchControls from './components/TouchControls';
 import { characters } from './data/characters';
 import { items as allItemPool } from './data/items';
 import { playSound } from './engine/SoundManager';
@@ -415,6 +416,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', position: 'relative' }}>
+      <TouchControls />
       {/* Fade transition overlay */}
       {transitioning && (
         <div style={{
